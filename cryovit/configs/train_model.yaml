@@ -1,10 +1,10 @@
 label_key: mito
 
 exp_paths:
-  cryovit_root: /sdf/home/s/sanketg/projects/CryoVIT
+  cryovit_root: /sdf/home/c/cathyhou/projects/test/CryoVIT
   exp_dir: ${.cryovit_root}/experiments/${exp_name}
-  tomo_dir: ${.cryovit_root}/cryovit_dataset/dino_features
-  split_file: ${.cryovit_root}/cryovit_dataset/csv/splits.csv
+  tomo_dir: ${.cryovit_root}/data/dino_features
+  split_file: ${.cryovit_root}/data/csv/splits.csv
 
 #################### Do not modify #####################
 

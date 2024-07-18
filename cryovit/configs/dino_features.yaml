@@ -1,11 +1,11 @@
 # Root directory for the CryoVIT package
-cryovit_root: /sdf/home/s/sanketg/projects/CryoVIT
+cryovit_root: /sdf/home/c/cathyhou/projects/test/CryoVIT
 
 # Path to the DINOv2 foundation model
-dino_dir: /sdf/home/s/sanketg/projects/foundation_models
+dino_dir: /sdf/home/c/cathyhou/projects/foundation_models
 
 # Directory containing tomograms and CSV files
-data_dir: ${cryovit_root}/cryovit_dataset
+data_dir: ${.cryovit_root}/data
 
 # Destination to save the generated DINOv2 features
 feature_dir: ${data_dir}/dino_features
