@@ -13,14 +13,17 @@ slice_markers = None
 
 def open_next_tomogram(session):
     from chimerax.markers import MarkerSet
+    from chimerax.core.colors import Color
 
     global zlimit_markers, slice_markers
 
-    session.logger.debug(f"Opening {files[file_n]}")
+    session.logger.info(f"Opening {files[file_n]}")
     models, _ = session.open_command.open_data(str(files[file_n]))
     # Create marker sets
     zlimit_markers = MarkerSet(session, name="zlimits")
+    zlimit_markers.set_color(Color((1, 0, 0)))
     slice_markers = MarkerSet(session, name="slices")
+    slice_markers.set_color(Color((0, 1, 0)))
     session.models.add([models[0], zlimit_markers, slice_markers])
 
 
@@ -31,9 +34,6 @@ def save_slices(session, filename, slices):
     from chimerax.map import Volume
 
     global dst_path
-
-    # Create destination directory if it doesn't exist
-    os.makedirs(dst_path, exist_ok=True)
 
     # Get tomogram data from Volume model
     data = None
@@ -60,25 +60,35 @@ def save_slices(session, filename, slices):
 def set_tomogram_slices(
     session,
     src_dir: str,
+    sample: str = None,
     dst_dir: str = None,
-    csv_file: str = None,
+    csv_dir: str = None,
     num_slices: int = 5,
 ):
+    import os
     from pathlib import Path
 
     global src_path, dst_path, csv_path, slice_n, files, file_n, csv_data
 
-    src_path = Path(src_dir).resolve()
+    if sample:
+        src_path = Path(src_dir).resolve() / sample
+    else:
+        src_path = Path(src_dir).resolve()
+        sample = src_path.name
     # Check for .png dst folder
     if dst_dir:
         dst_path = Path(dst_dir).resolve()
     else:
-        dst_path = src_path.parent.resolve() / "slices"
+        dst_path = Path(src_dir).parent.resolve() / "slices" / sample
+    # Create destination directory if it doesn't exist
+    os.makedirs(dst_path, exist_ok=True)
     # Check for .csv file
-    if csv_file:
-        csv_path = Path(csv_file).resolve()
+    if csv_dir:
+        csv_path = Path(csv_dir).resolve() / f"{sample}.csv"
     else:
-        csv_path = src_path.parent.resolve() / "slices.csv"
+        csv_path = Path(src_dir).parent.resolve() / "csv" / f"{sample}.csv"
+    # Create csv directory if it doesn't exist
+    os.makedirs(csv_path.parent, exist_ok=True)
     slice_n = num_slices
     files = list(
         p.resolve()
@@ -90,7 +100,7 @@ def set_tomogram_slices(
 
     # Preview the number of valid tomogram files
     session.logger.info(
-        f"Found {len(list(files))} tomogram files in {src_path}."
+        f"Found {len(list(files))} tomogram files for {sample}."
     )
     # Start looping through all tomogram files
     open_next_tomogram(session)
@@ -99,7 +109,7 @@ def set_tomogram_slices(
 def next_tomogram(session):
     from chimerax.std_commands.close import close
 
-    global dst_path, slice_n, files, file_n, csv_data
+    global csv_path, slice_n, files, file_n, csv_data
 
     # Check that labelling has started
     if not src_path:
@@ -137,16 +147,14 @@ def next_tomogram(session):
         import csv
 
         # Save csv data to file
-        with open(src_path / "slices.csv", "w", newline="") as f:
+        with open(csv_path, "w+", newline="") as f:
             writer = csv.writer(f)
             header = ["tomo_name", "z_min", "z_max"] + [
                 f"slice_{i}" for i in range(slice_n)
             ]
             writer.writerow(header)
             writer.writerows(csv_data)
-        session.logger.info(
-            f"Saved {len(csv_data)} tomograms to {src_path / 'slices.csv'}."
-        )
+        session.logger.info(f"Saved {len(csv_data)} tomograms to {csv_path}.")
 
 
 def register_commands(logger):
@@ -156,14 +164,16 @@ def register_commands(logger):
         OpenFolderNameArg,
         SaveFolderNameArg,
         SaveFileNameArg,
+        StringArg,
         IntArg,
     )
 
     slices_desc = CmdDesc(
         required=[("src_dir", OpenFolderNameArg)],
+        optional=[("sample", StringArg)],
         keyword=[
             ("dst_dir", SaveFolderNameArg),
-            ("csv_file", SaveFileNameArg),
+            ("csv_dir", SaveFileNameArg),
             ("num_slices", IntArg),
         ],
         synopsis="Start setting the z-limits and slice numbers to label for a tomogram sample.",
@@ -179,4 +189,16 @@ def register_commands(logger):
     register("next", next_desc, next_tomogram, logger=logger)
 
 
+session.logger.info(
+    """
+Start labelling tomograms by running 'start slice labels'.
+    This expects as arguments a tomogram directory and, optionally, a sample name. By default, the slices will be saved in a folder called 'slices/sample' in the parent directory of the tomogram directory, and a .csv file will be saved in a folder called 'csv/sample' in that same parent directory.
+    
+    Optional keyword arguments are: 'dst_dir' for specifying the slice directory, 'csv_dir' for specifying the csv directory, and 'num_slices' for specifying the number of slices to label (default is 5).
+
+    For example: 'start slice labels "./Raw Tomograms" Q66' will label 5 slices of the tomograms in the directory "./Raw Tomograms/Q66" and save them in the directory "./slices/Q66" and the csv file in "./csv/Q66".
+    
+After running 'start slice labels', use plane markers to select slices and z-limits, and run 'next' to save the slices and open the next tomogram.
+"""
+)
 register_commands(session.logger)
