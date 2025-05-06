@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from dataclasses import field
 from enum import Enum
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Union
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -21,6 +21,14 @@ class Sample(Enum):
 
 
 samples = [sample.name for sample in Sample]
+
+
+class ModelArch(Enum):
+    CRYOVIT = "CryoViT"
+    UNET3D = "UNet3D"
+
+
+models = [model.name for model in ModelArch]
 
 
 @dataclass
@@ -310,6 +318,26 @@ class EvalModelConfig:
     dataset: Dataset = MISSING
     exp_paths: ExpPaths = MISSING
     dataloader: DataLoader = field(default=DataLoader())
+
+
+@dataclass
+class InterfaceModelConfig:
+    """Metadata for a model for GUI use.
+
+    Attributes:
+        name (str): Name of the model.
+        label_key (str): Key used to specify the training label.
+        model_type (ModelArch): The type of model/model architecture used: cryovit or unet3d.
+        training_sample (Union[str, List[str]]): Sample(s) used for training the model.
+        val_accuracy (float): Accuracy of the model on the training sample(s).
+    """
+
+    name: str
+    label_key: str
+    model_type: ModelArch
+    model_params: Dict[str, Union[str, int, float]]
+    samples: Union[str, List[str]]
+    dice_score: float
 
 
 cs = ConfigStore.instance()
