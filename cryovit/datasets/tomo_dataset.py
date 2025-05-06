@@ -17,9 +17,9 @@ class TomoDataset(Dataset):
     def __init__(
         self,
         records: pd.DataFrame,
-        input_key: str,
-        label_key: str,
         data_root: Path,
+        input_key: str,
+        label_key: str = None,
         train: bool = False,
         aux_keys: List[str] = [],
     ) -> None:
@@ -27,9 +27,9 @@ class TomoDataset(Dataset):
 
         Args:
             records (pd.DataFrame): A DataFrame containing records of tomograms.
+            data_root (Path): The root directory where the tomograms are stored.
             input_key (str): The key in the HDF5 file to access input features.
             label_key (str): The key in the HDF5 file to access labels.
-            data_root (Path): The root directory where the tomograms are stored.
             train (bool): Flag to determine if the dataset is for training (enables transformations).
             aux_keys (List[str]): Additional keys for auxiliary data to load from the HDF5 files.
         """
@@ -81,7 +81,8 @@ class TomoDataset(Dataset):
 
         with h5py.File(tomo_path) as fh:
             data["input"] = fh[self.input_key][()]
-            data["label"] = fh[self.label_key][()]
+            if self.label_key is not None:
+                data["label"] = fh[self.label_key][()]
             data |= {key: fh[key][()] for key in self.aux_keys}
 
         return data
@@ -108,9 +109,14 @@ class TomoDataset(Dataset):
         hi = np.random.choice(delta_h) if delta_h > 0 else 0
         wi = np.random.choice(delta_w) if delta_w > 0 else 0
 
-        record["input"] = record["input"][..., di : di + x, hi : hi + y, wi : wi + z]
+        record["input"] = record["input"][
+            ..., di : di + x, hi : hi + y, wi : wi + z
+        ]
 
         if self.input_key == "dino_features":
             hi, wi, y, z = 16 * np.array([hi, wi, y, z])
 
-        record["label"] = record["label"][di : di + x, hi : hi + y, wi : wi + z]
+        if self.label_key is not None:
+            record["label"] = record["label"][
+                di : di + x, hi : hi + y, wi : wi + z
+            ]

@@ -52,7 +52,9 @@ class BaseModel(LightningModule):
 
     def forward(self):
         """Should be implemented in subclass."""
-        raise NotImplementedError("The forward method must be implemented by subclass.")
+        raise NotImplementedError(
+            "The forward method must be implemented by subclass."
+        )
 
     def configure_optimizers(self) -> Optimizer:
         """Configures the optimizer with the initialization parameters."""
@@ -122,11 +124,15 @@ class BaseModel(LightningModule):
         """Processes one batch during training."""
         return self.step(batch, "TRAIN")
 
-    def validation_step(self, batch: Dict[str, Tensor], batch_idx: int) -> float:
+    def validation_step(
+        self, batch: Dict[str, Tensor], batch_idx: int
+    ) -> float:
         """Processes one batch during validation."""
         return self.step(batch, "VAL")
 
-    def test_step(self, batch: Dict[str, Tensor], batch_idx: int) -> Dict[str, Any]:
+    def test_step(
+        self, batch: Dict[str, Tensor], batch_idx: int
+    ) -> Dict[str, Any]:
         """Processes one batch during testing, captures predictions, and computes losses and metrics.
 
         Args:
@@ -161,3 +167,9 @@ class BaseModel(LightningModule):
             metric_fn.reset()
 
         return results
+
+    def predict_step(
+        self, batch: Dict[str, Tensor], batch_idx: int, dataloader_idx: int = 0
+    ) -> torch.Tensor:
+        """Processes one batch during prediction."""
+        return self(batch["input"])
