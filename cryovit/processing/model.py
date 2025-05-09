@@ -144,6 +144,7 @@ def get_dino_features(
     batch_size: int,
     dst_dir: Path = None,
     csv_file: Path = None,
+    callback_fn: callable = None,
 ):
     """Compute DINOv2 features for a set of tomograms.
 
@@ -153,6 +154,7 @@ def get_dino_features(
         batch_size (int): Batch size for processing the tomograms.
         dst_dir (Path, optional): Path to the directory to save tomograms with DINOv2 features. Defaults to None. If None, features will be added to the original tomograms.
         csv_file (Path, optional): Path to the .csv file for specifying which tomograms to compute. Defaults to None. If None, all tomograms in the directory will be used.
+        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     torch.set_float32_matmul_precision("high")  # ensures tensor cores are used
 
@@ -192,6 +194,7 @@ def get_dino_features(
             shutil.copy(data_dir / records[i], dst_dir / records[i])
         with h5py.File(dst_dir / records[i], "r+") as fh:
             fh.create_dataset("dino_features", data=features)
+        callback_fn(i, len(dataloader)) if callback_fn else None
 
 
 def train_model(

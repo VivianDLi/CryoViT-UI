@@ -19,18 +19,21 @@ def add_annotations(
     annot_dir: Path,
     csv_file: Path,
     features: List[str],
+    callback_fn: callable = None,
 ) -> None:
     """Import annotations from a .png folder and add them to tomograms.
 
     Args:
         src_dir (Path): Path to the directory with tomograms.
+        dst_dir (Path): Path to the directory where the tomograms with annotations will be saved.
         annot_dir (Path): Path to the directory with annotations.
         csv_file (Path): Path to a .csv file specifying z-limits and labeled slices.
         features (List[str]): List of feature names in order of decreasing annotation value to be added to the tomograms.
+        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     os.makedirs(dst_dir, exist_ok=True)
     annotation_df = pd.read_csv(csv_file)
-    for row in tqdm(annotation_df.itertuples()):
+    for i, row in enumerate(annotation_df.itertuples()):
         # Get the tomogram name and z-limits from the DataFrame
         tomo_name = row[1]
         z_min, z_max = row[2:4]
@@ -63,6 +66,7 @@ def add_annotations(
             fh.create_dataset("data", data=data, compression="gzip")
             for feat in features:
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
+        callback_fn(i, len(annotation_df)) if callback_fn else None
 
 
 def add_splits(
@@ -71,14 +75,17 @@ def add_splits(
     sample: str = None,
     num_splits: int = 10,
     seed: int = 0,
+    callback_fn: callable = None,
 ) -> None:
     """Create splits for cross-validation.
 
     Args:
         dst_dir (Path): Path to the directory where the splits .csv will be saved.
         csv_file (Path): Path to the .csv file with annotations.
+        sample (str, optional): Sample name to be used in the splits. Defaults to None. If None, the sample name is extracted from the tomogram names.
         num_splits (int, optional): Number of splits for cross-validation. Defaults to 10.
         seed (int, optional): Random seed for reproducibility. Defaults to 0.
+        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     annotation_df = pd.read_csv(csv_file)
     n_samples = annotation_df.shape[0]
@@ -89,6 +96,7 @@ def add_splits(
     for fold_id, (_, test_ids) in enumerate(kf.split(X)):
         for idx in test_ids:
             annotation_df.at[idx, "split_id"] = fold_id
+        callback_fn(fold_id, n_splits) if callback_fn else None
     annotation_df["sample"] = (
         annotation_df["tomo_name"].str.split("_").str[1] if sample is None else sample
     )
@@ -101,6 +109,7 @@ def generate_new_splits(
     dst_file: Path = None,
     num_splits: int = 10,
     seed: int = 0,
+    callback_fn: callable = None,
 ) -> None:
     """Generate new splits for cross-validation given old splits.
 
@@ -109,6 +118,7 @@ def generate_new_splits(
         dst_file (Path, optional): Path to save the new splits. Defaults to None. If None, the old .csv will be replaced.
         num_splits (int, optional): Number of splits for cross-validation. Defaults to 10.
         seed (int, optional): Random seed for reproducibility. Defaults to 0.
+        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     splits_df = pd.read_csv(splits_file)
     n_samples = splits_df.shape[0]
@@ -119,6 +129,7 @@ def generate_new_splits(
     for fold_id, (_, test_ids) in enumerate(kf.split(X)):
         for idx in test_ids:
             splits_df.at[idx, "split_id"] = fold_id
+        callback_fn(fold_id, n_splits) if callback_fn else None
 
     if dst_file is None:
         dst_file = splits_file
