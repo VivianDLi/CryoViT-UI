@@ -39,9 +39,7 @@ def save_slices(session, filename, slices):
     data = None
     for model in session.models:
         if isinstance(model, Volume):
-            data = model.data.read_matrix(
-                (0, 0, 0), model.data.size, (1, 1, 1), False
-            )
+            data = model.data.read_matrix((0, 0, 0), model.data.size, (1, 1, 1), False)
     # Check data was found
     if data is None:
         session.logger.error(f"No tomogram data found to save.")
@@ -91,17 +89,13 @@ def set_tomogram_slices(
     os.makedirs(csv_path.parent, exist_ok=True)
     slice_n = num_slices
     files = list(
-        p.resolve()
-        for p in src_path.glob("*")
-        if p.suffix in {".rec", ".mrc", ".hdf"}
+        p.resolve() for p in src_path.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
     )
     file_n = 0
     csv_data = []
 
     # Preview the number of valid tomogram files
-    session.logger.info(
-        f"Found {len(list(files))} tomogram files for {sample}."
-    )
+    session.logger.info(f"Found {len(list(files))} tomogram files for {sample}.")
     # Start looping through all tomogram files
     open_next_tomogram(session)
 
@@ -183,9 +177,7 @@ def register_commands(logger):
         keyword=[],
         synopsis="Finish processing current tomogram, save as an image, and open the next tomogram to label.",
     )
-    register(
-        "start slice labels", slices_desc, set_tomogram_slices, logger=logger
-    )
+    register("start slice labels", slices_desc, set_tomogram_slices, logger=logger)
     register("next", next_desc, next_tomogram, logger=logger)
 
 
@@ -202,3 +194,55 @@ After running 'start slice labels', use plane markers to select slices and z-lim
 """
 )
 register_commands(session.logger)
+
+# Setup launching ChimeraX from the command line with script arguments
+import argparse
+
+parser = argparse.ArgumentParser(
+    description="ChimeraX script to select tomogram slices to label and set-up min and max z-values for annotation and export slices as pngs in ChimeraX.",
+)
+parser.add_argument(
+    "src_dir",
+    type=str,
+    help="Source directory of tomograms. If a sample name is provided, it will be used as the subdirectory (e.g., 'src_dir/sample').",
+)
+parser.add_argument(
+    "sample",
+    type=str,
+    default=None,
+    help="Optional sample name to use as subdirectory. If not provided, the script will take the sample to be the name of the src_dir.",
+)
+parser.add_argument(
+    "--dst_dir",
+    dest="dst_dir",
+    type=str,
+    default=None,
+    help="Directory for saving slices. If not provided, defaults to '/slices/sample' in the parent directory of src_dir.",
+)
+parser.add_argument(
+    "--csv_dir",
+    dest="csv_dir",
+    type=str,
+    default=None,
+    help="Directory for saving the .csv file. If not provided, defaults to '/csv' in the parent directory of src_dir. The .csv file will be named 'sample.csv'.",
+)
+parser.add_argument(
+    "--num_slices",
+    dest="num_slices",
+    type=int,
+    default=5,
+    help="Number of slices to label. Default is 5.",
+)
+args = parser.parse_args()
+if args.src_dir:
+    session.logger.info(
+        "Detected command line arguments. Running script with arguments."
+    )
+    set_tomogram_slices(
+        session,
+        args.src_dir,
+        sample=args.sample,
+        dst_dir=args.dst_dir,
+        csv_dir=args.csv_dir,
+        num_slices=args.num_slices,
+    )

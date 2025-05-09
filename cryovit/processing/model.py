@@ -14,7 +14,7 @@ from hydra.utils import instantiate
 import pandas as pd
 import torch
 from pytorch_lightning import seed_everything
-from  pytorch_lightning.callbacks import BasePredictionWriter
+from pytorch_lightning.callbacks import BasePredictionWriter
 
 from cryovit.datasets import TomoDataset, VITDataset
 from cryovit.models.base_model import BaseModel
@@ -24,15 +24,23 @@ from cryovit.run.dino_features import (
     dino_features,
     dataloader_params,
 )
-from cryovit.config import DataLoader, InterfaceModelConfig, Trainer, TrainerFit, MultiSample
+from cryovit.config import (
+    DataLoader,
+    InterfaceModelConfig,
+    Trainer,
+    TrainerFit,
+    MultiSample,
+)
+
 
 class TomoPredictionWriter(BasePredictionWriter):
     """Callback to add label predictions to tomograms."""
+
     def __init__(self, results_dir: Path, label_key: str) -> None:
         self.results_dir = results_dir
         self.label_key = label_key
         os.makedirs(self.results_dir, exist_ok=True)
-  
+
     def write_on_batch_end(
         self,
         trainer: Trainer,
@@ -59,6 +67,7 @@ class TomoPredictionWriter(BasePredictionWriter):
             fh.create_dataset("data", data=batch["data"])
             fh.create_dataset(self.label_key, data=prediction, compression="gzip")
 
+
 def get_available_models(model_dir: Path) -> List[str]:
     """Get a list of available models in the specified directory.
 
@@ -70,7 +79,10 @@ def get_available_models(model_dir: Path) -> List[str]:
     """
     return [f.stem for f in model_dir.glob("*.pt") if f.is_file()]
 
-def get_model_configs(model_dir: Path, model_names: List[str]) -> List[InterfaceModelConfig]:
+
+def get_model_configs(
+    model_dir: Path, model_names: List[str]
+) -> List[InterfaceModelConfig]:
     """Get model information for a list of model names.
 
     Args:
@@ -86,6 +98,7 @@ def get_model_configs(model_dir: Path, model_names: List[str]) -> List[Interface
             model_config = InterfaceModelConfig(**json.load(f))
         configs.append(model_config)
     return configs
+
 
 def save_model(
     model: BaseModel,
@@ -121,7 +134,7 @@ def load_model(
         model.load_state_dict(torch.load(model_weights))
     except RuntimeError as e:
         logging.error(f"Error loading model weights from {model_weights}: {e}")
-    
+
     return model, model_config
 
 
@@ -158,11 +171,9 @@ def get_dino_features(
         records = pd.read_csv(csv_file)["tomo_name"]
     else:
         # use all files in the directory
-        records = pd.Series([
-            f.name
-            for f in data_dir.glob("*")
-            if f.suffix in {".rec", ".mrc", ".hdf"}
-        ])
+        records = pd.Series(
+            [f.name for f in data_dir.glob("*") if f.suffix in {".rec", ".mrc", ".hdf"}]
+        )
     dataset = VITDataset(records, root=data_dir)
     dataloader = DataLoader(dataset, **dataloader_params)
     # Load the DINOv2 model
@@ -222,7 +233,9 @@ def train_model(
         "data_root": data_dir,
         "aux_keys": ["data"],
     }
-    datamodule = instantiate(MultiSample(sample=tuple(model_config.samples, split_id=split_id)))(
+    datamodule = instantiate(
+        MultiSample(sample=tuple(model_config.samples, split_id=split_id))
+    )(
         split_file=split_file,
         dataloader_fn=instantiate(DataLoader(batch_size=batch_size)),
         dataset_params=dataset_params,
@@ -237,12 +250,17 @@ def train_model(
         val_dataloaders=datamodule.val_dataloader(),
     )
     metrics = trainer.validate(model, dataloaders=datamodule.test_dataloader())
-    model_config.dice_score = metrics[0]["VAL_DiceMetric"]
+    model_config.metrics = metrics[0]
 
 
 def run_inference(
-    model: BaseModel, model_config: InterfaceModelConfig, data_dir: Path, batch_size: int = None, dst_dir: Path = None
-, csv_file: Path = None) -> None:
+    model: BaseModel,
+    model_config: InterfaceModelConfig,
+    data_dir: Path,
+    batch_size: int = None,
+    dst_dir: Path = None,
+    csv_file: Path = None,
+) -> None:
     """Run inference on a set of tomograms using the specified model.
 
     Args:
@@ -259,20 +277,32 @@ def run_inference(
         records = pd.read_csv(csv_file)["tomo_name"]
     else:
         # use all files in the directory
-        records = pd.DataFrame({"tomo_name": [
-            f.name
-            for f in data_dir.glob("*")
-            if f.suffix in {".rec", ".mrc", ".hdf"}
-        ]})
+        records = pd.DataFrame(
+            {
+                "tomo_name": [
+                    f.name
+                    for f in data_dir.glob("*")
+                    if f.suffix in {".rec", ".mrc", ".hdf"}
+                ]
+            }
+        )
     records["sample"] = data_dir.name
     match model_config.model_type:
         case "CryoViT":
             input_key = "dino_features"
         case _:
             input_key = "data"
-    dataset = TomoDataset(records=records, data_root=data_dir, input_key=input_key, train=False, aux_keys=["data"])
+    dataset = TomoDataset(
+        records=records,
+        data_root=data_dir,
+        input_key=input_key,
+        train=False,
+        aux_keys=["data"],
+    )
     dataloader = instantiate(DataLoader(batch_size=batch_size))(dataset, shuffle=False)
     # Setup trainer
-    pred_writer = TomoPredictionWriter(dst_dir, model_config.label_key, write_interval="batch")
+    pred_writer = TomoPredictionWriter(
+        dst_dir, model_config.label_key, write_interval="batch"
+    )
     trainer = instantiate(Trainer(callbacks=[pred_writer]))
     trainer.predict(model, dataloader, return_predictions=False)

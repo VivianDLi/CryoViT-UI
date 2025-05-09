@@ -44,9 +44,7 @@ def add_annotations(
         with h5py.File(src_dir / tomo_name, "r") as fh:
             data = fh["data"][()]  # d, w, h
         # Load annotations
-        feature_labels = {
-            feat: np.zeros_like(data, dtype=np.int8) for feat in features
-        }
+        feature_labels = {feat: np.zeros_like(data, dtype=np.int8) for feat in features}
         for feat in features:
             feature_labels[feat][z_min:z_max] = -1
 
@@ -64,9 +62,7 @@ def add_annotations(
         with h5py.File(dst_tomo_dir / tomo_name, "w") as fh:
             fh.create_dataset("data", data=data, compression="gzip")
             for feat in features:
-                fh.create_dataset(
-                    feat, data=feature_labels[feat], compression="gzip"
-                )
+                fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
 
 
 def add_splits(
@@ -79,15 +75,14 @@ def add_splits(
     """Create splits for cross-validation.
 
     Args:
+        dst_dir (Path): Path to the directory where the splits .csv will be saved.
         csv_file (Path): Path to the .csv file with annotations.
         num_splits (int, optional): Number of splits for cross-validation. Defaults to 10.
         seed (int, optional): Random seed for reproducibility. Defaults to 0.
     """
     annotation_df = pd.read_csv(csv_file)
     n_samples = annotation_df.shape[0]
-    n_splits = (
-        n_samples if n_samples < num_splits or num_splits == 0 else num_splits
-    )
+    n_splits = n_samples if n_samples < num_splits or num_splits == 0 else num_splits
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     X = [[0] for _ in range(n_samples)]
     annotation_df["split_id"] = -1
@@ -95,14 +90,10 @@ def add_splits(
         for idx in test_ids:
             annotation_df.at[idx, "split_id"] = fold_id
     annotation_df["sample"] = (
-        annotation_df["tomo_name"].str.split("_").str[1]
-        if sample is None
-        else sample
+        annotation_df["tomo_name"].str.split("_").str[1] if sample is None else sample
     )
 
-    annotation_df.to_csv(
-        dst_dir / "splits.csv", mode="a", index=False, header=False
-    )
+    annotation_df.to_csv(dst_dir / "splits.csv", mode="a", index=False, header=False)
 
 
 def generate_new_splits(
@@ -121,9 +112,7 @@ def generate_new_splits(
     """
     splits_df = pd.read_csv(splits_file)
     n_samples = splits_df.shape[0]
-    n_splits = (
-        n_samples if n_samples < num_splits or num_splits == 0 else num_splits
-    )
+    n_splits = n_samples if n_samples < num_splits or num_splits == 0 else num_splits
     kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
     X = [[0] for _ in range(n_samples)]
     splits_df["split_id"] = -1

@@ -10,9 +10,7 @@ import torch
 
 
 def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
-    pooler = torch.nn.AvgPool3d(
-        kernel_size=bin_size, stride=bin_size, ceil_mode=True
-    )
+    pooler = torch.nn.AvgPool3d(kernel_size=bin_size, stride=bin_size, ceil_mode=True)
 
     # pooler expects (C, D, H, W) input and tomogram is (D, H, W)
     data = torch.Tensor(np.expand_dims(data, axis=0))
@@ -49,9 +47,7 @@ def run_preprocess(
         clip (bool, optional): Whether to clip normalized values to +/- 3 std devs. Defaults to True.
     """
     files = (
-        p.resolve()
-        for p in src_dir.glob("*")
-        if p.suffix in {".rec", ".mrc", ".hdf"}
+        p.resolve() for p in src_dir.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
     )
     logging.info(f"Found {len(list(files))} files in {src_dir}.")
     for file_name in files:
