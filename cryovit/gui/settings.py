@@ -224,7 +224,7 @@ class BaseSetting:
         results = []
         for f in dataclasses.fields(self):
             if not isinstance(getattr(self, f.name), BaseSetting):
-                results.append(f)
+                results.append(f.name)
                 continue
             subfields = getattr(self, f.name).get_available_settings()
             results.extend([f"{f.name}/{subfield}" for subfield in subfields])
