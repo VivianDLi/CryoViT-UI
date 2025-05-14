@@ -1,6 +1,7 @@
 """Script for training, evaluating, and running inference with a model for GUI use."""
 
 import os
+import sys
 from pathlib import Path
 import shutil
 import json
@@ -30,7 +31,16 @@ from cryovit.config import (
     Trainer,
     TrainerFit,
     MultiSample,
+    ModelArch,
 )
+
+# Setup logger
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 class TomoPredictionWriter(BasePredictionWriter):
@@ -64,8 +74,13 @@ class TomoPredictionWriter(BasePredictionWriter):
         """
         # Save predictions to disk
         with h5py.File(self.results_dir / batch["tomo_name"], "w+") as fh:
+            if "data" in fh:
+                del fh["data"]
             fh.create_dataset("data", data=batch["data"])
-            fh.create_dataset(self.label_key, data=prediction, compression="gzip")
+            pred_key = "predictions/" + self.label_key
+            if pred_key in fh:
+                del fh[pred_key]
+            fh.create_dataset(pred_key, data=prediction, compression="gzip")
 
 
 def get_available_models(model_dir: Path) -> List[str]:
@@ -101,14 +116,16 @@ def get_model_configs(
 
 
 def save_model(
-    model: BaseModel,
     model_config: InterfaceModelConfig,
     model_dir: Path,
-    model_name: str,
+    model_name: str = None,
+    model: BaseModel = None,
 ) -> None:
-    # Save model weights
-    torch.save(model.state_dict(), model_dir / f"{model_name}.pt")
-    torch.cuda.empty_cache()
+    model_name = model_name if model_name else model_config.model_name
+    if model:
+        # Save model weights
+        torch.save(model.state_dict(), model_dir / f"{model_name}.pt")
+        torch.cuda.empty_cache()
     # Save model configuration
     with open(model_dir / f"{model_name}.json", "w") as f:
         json.dump(model_config, f, default=lambda x: x.value)
@@ -121,13 +138,7 @@ def load_model(
     with open(model_dir / f"{model_name}.json", "r") as f:
         model_config = InterfaceModelConfig(**json.load(f))
     # Create model instance
-    match model_config.model_type:
-        case "CryoViT":
-            model = CryoVIT(**model_config.model_params)
-        case "UNet3D":
-            model = UNet3D(**model_config.model_params)
-        case _:
-            raise ValueError(f"Unknown model type: {model_config.model_type}")
+    model = load_base_model(model_config)
     # Load model weights
     try:
         model_weights = model_dir / f"{model_name}.pt"
@@ -136,6 +147,25 @@ def load_model(
         logging.error(f"Error loading model weights from {model_weights}: {e}")
 
     return model, model_config
+
+
+def load_base_model(model_config: InterfaceModelConfig) -> BaseModel:
+    """Load a base model based on the provided configuration.
+
+    Args:
+        model_config (InterfaceModelConfig): The model configuration.
+
+    Returns:
+        BaseModel: The loaded model.
+    """
+    match model_config.model_type:
+        case ModelArch.CRYOVIT:
+            model = CryoVIT(**model_config.model_params)
+        case ModelArch.UNET3D:
+            model = UNet3D(**model_config.model_params)
+        case _:
+            logger.error(f"Unknown model type: {model_config.model_type}")
+    return model
 
 
 def get_dino_features(
@@ -193,6 +223,8 @@ def get_dino_features(
             # copy tomograms to a new directory
             shutil.copy(data_dir / records[i], dst_dir / records[i])
         with h5py.File(dst_dir / records[i], "r+") as fh:
+            if "dino_features" in fh:
+                del fh["dino_features"]
             fh.create_dataset("dino_features", data=features)
         callback_fn(i, len(dataloader)) if callback_fn else None
 
@@ -291,7 +323,7 @@ def run_inference(
         )
     records["sample"] = data_dir.name
     match model_config.model_type:
-        case "CryoViT":
+        case ModelArch.CRYOVIT:
             input_key = "dino_features"
         case _:
             input_key = "data"
@@ -305,7 +337,9 @@ def run_inference(
     dataloader = instantiate(DataLoader(batch_size=batch_size))(dataset, shuffle=False)
     # Setup trainer
     pred_writer = TomoPredictionWriter(
-        dst_dir, model_config.label_key, write_interval="batch"
+        dst_dir,
+        model_config.name + "_" + model_config.label_key,
+        write_interval="batch",
     )
     trainer = instantiate(Trainer(callbacks=[pred_writer]))
     trainer.predict(model, dataloader, return_predictions=False)

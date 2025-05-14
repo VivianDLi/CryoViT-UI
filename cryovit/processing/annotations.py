@@ -1,16 +1,25 @@
 """Script for adding annotations to tomograms and setting up splits for training."""
 
 import os
+import sys
 from pathlib import Path
 from PIL import Image
 from typing import List
+import logging
 
 import h5py
-import tqdm
 import numpy as np
 import pandas as pd
 from scipy import ndimage
 from sklearn.model_selection import KFold
+
+# Setup logger
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def add_annotations(
@@ -63,8 +72,12 @@ def add_annotations(
 
         # Save the tomogram with annotations
         with h5py.File(dst_tomo_dir / tomo_name, "w") as fh:
+            if "data" in fh:
+                del fh["data"]
             fh.create_dataset("data", data=data, compression="gzip")
             for feat in features:
+                if feat in fh:
+                    del fh[feat]
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
         callback_fn(i, len(annotation_df)) if callback_fn else None
 

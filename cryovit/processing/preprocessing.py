@@ -1,12 +1,21 @@
 """Script for pre-processing raw tomogram data based on configuration files."""
 
 import os
+import sys
 import logging
 from pathlib import Path
 
 from h5py import File
 import numpy as np
 import torch
+
+# Setup logger
+logger = logging.getLogger(__name__)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 
 def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
@@ -20,7 +29,7 @@ def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
     return data
 
 
-def normalize(data: np.ndarray, clip: bool) -> np.ndarray:
+def normalize_data(data: np.ndarray, clip: bool) -> np.ndarray:
     # normalize the tomogram to the range [-1, 1]
     data = (data - np.mean(data)) / np.std(data)
     if clip:
@@ -48,21 +57,23 @@ def run_preprocess(
         clip (bool, optional): Whether to clip normalized values to +/- 3 std devs. Defaults to True.
         callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
-    files = (
+    files = list(
         p.resolve() for p in src_dir.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
     )
-    logging.info(f"Found {len(list(files))} files in {src_dir}.")
+    logger.info(f"Found {len(files)} files in {src_dir}.")
     for i, file_name in enumerate(files):
-        logging.debug(f"Processing {file_name}.")
+        logger.debug(f"Processing {file_name}.")
         # load tomogram
         with File(file_name, "r") as fh:
-            data = fh["MDF"]["images"]["0"]["image"][()]
+            data = (
+                fh["MDF"]["images"]["0"]["image"][()] if "MDF" in fh else fh["data"][()]
+            )
         # pool tomogram
         if bin_size > 1:
             data = pool(data, bin_size)
         # normalize tomogram
         if normalize:
-            data = normalize(data, clip)
+            data = normalize_data(data, clip)
         # save tomogram
         if dst_dir is None:
             dst_dir = file_name
@@ -70,5 +81,7 @@ def run_preprocess(
             os.makedirs(dst_dir, exist_ok=True)
             dst_path = dst_dir / file_name.name
         with File(dst_path, "a") as fh:
+            if "data" in fh:
+                del fh["data"]
             fh.create_dataset("data", data=data)
         callback_fn(i, len(files)) if callback_fn else None
