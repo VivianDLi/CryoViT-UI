@@ -7,8 +7,11 @@ from PyQt6.QtWidgets import (
     QDialog,
     QMessageBox,
     QDialogButtonBox,
+    QFrame,
+    QVBoxLayout,
     QFormLayout,
     QGroupBox,
+    QScrollArea,
     QLabel,
     QLineEdit,
     QSpinBox,
@@ -22,7 +25,14 @@ from cryovit.gui.layouts.presetdialog import Ui_Dialog
 
 
 class PresetDialog(QDialog, Ui_Dialog):
-    def __init__(self, parent, title, *presets, current_preset: str = None):
+    def __init__(
+        self,
+        parent,
+        title,
+        *presets,
+        current_preset: str = None,
+        load_preset: bool = False,
+    ):
         super().__init__(parent)
         self.setupUi(self)
         self.setWindowTitle(title)
@@ -34,13 +44,22 @@ class PresetDialog(QDialog, Ui_Dialog):
             index = self.presetSelect.findText(current_preset)
             if index != -1:
                 self.presetSelect.setCurrentIndex(index)
+            else:
+                parent.log(
+                    "warning",
+                    f"Preset '{current_preset}' not found in the list of presets.",
+                )
         else:
             self.presetSelect.setCurrentIndex(0)
             self.result = self.presetSelect.itemText(0)
-        self.presetSelect.currentIndexChanged.connect(self._set_result_from_index)
         self.presetName.returnPressed.connect(self._add_preset)
+        self.presetName.returnPressed.disconnect(self._remove_preset)
         self.presetAdd.clicked.connect(self._add_preset)
         self.presetRemove.clicked.connect(self._remove_preset)
+        if load_preset:
+            self.presetName.returnPressed.disconnect(self._add_preset)
+            self.presetName.returnPressed.connect(self._remove_preset)
+            self.presetAdd.setVisible(False)
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -92,9 +111,16 @@ class PresetDialog(QDialog, Ui_Dialog):
             QMessageBox.critical(self, "Error", f"Error removing preset: {e}")
             return
 
-    def _set_result_from_index(self, index):
-        """Set the result of the dialog to the selected preset."""
+    def accept(self):
+        """Override accept to set the result to the selected preset and close the dialog."""
+        index = self.presetSelect.currentIndex()
         self.result = self.presetSelect.itemText(index) if index != -1 else None
+        super().accept()
+
+    def reject(self):
+        """Override reject to set the result to None and close the dialog."""
+        self.result = None
+        super().reject()
 
 
 class SettingsWindow(QDialog, Ui_SettingsWindow):
@@ -111,81 +137,102 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         for key in settings.allKeys():
             self.set_setting(key, settings.value(key))
 
-    def createSettingsUI(self):
-        for field in dataclasses.fields(self.settings):
-            group_box = QGroupBox(parent=self, title=field.name.capitalize())
-            group_box.setObjectName(f"groupBox_{field.name}")
-            form_layout = QFormLayout(parent=group_box)
-            form_layout.setObjectName(f"formLayout_{field.name}")
-            for i, subfield in enumerate(
-                dataclasses.fields(getattr(self.settings, field.name))
-            ):
-                label = QLabel(parent=group_box, text=subfield.name.capitalize())
-                match subfield.type.__qualname__:
-                    case str.__qualname__:
-                        data = QLineEdit(
-                            parent=group_box,
-                            text=self.get_setting(field.name + "/" + subfield.name),
-                        )
-                        data.setObjectName(f"lineEdit_{field.name}_{subfield.name}")
-                        data.editingFinished.connect(
-                            lambda: self.set_setting(
-                                field.name + "/" + subfield.name, data.text()
+        self.createSettingsUI(self.settings, self)
+
+    def createSettingsUI(
+        self,
+        parent: "BaseSetting",
+        parent_widget: QGroupBox | QScrollArea,
+        parent_name: str = None,
+    ):
+        for field in dataclasses.fields(parent):
+            variable_name = (
+                parent_name + "__" + field.name if parent_name else field.name
+            )  # double underscore to avoid replacing parts of the name
+            if isinstance(getattr(parent, field.name), BaseSetting):
+                # Create a group box for the field with a vertical layout and initial form layout
+                group_box = QGroupBox(
+                    parent=parent_widget, title=field.name.capitalize()
+                )
+                group_box.setObjectName(f"groupBox_{variable_name}")
+                group_vbox = QVBoxLayout(group_box)
+                group_vbox.setContentsMargins(0, 0, 0, 0)
+                group_vbox.setObjectName(f"verticalLayout_{variable_name}")
+                form_frame = QFrame(parent=group_box)
+                form_frame.setFrameShape(QFrame.Shape.StyledPanel)
+                form_frame.setFrameShadow(QFrame.Shadow.Raised)
+                form_frame.setObjectName(f"frame_{variable_name}")
+                group_form = QFormLayout(form_frame)
+                group_form.setObjectName(f"formLayout_{variable_name}")
+                parent_layout = (
+                    self.verticalLayoutScroll
+                    if parent_name is None
+                    else parent_widget.findChild(
+                        QVBoxLayout, f"verticalLayout_{parent_name}"
+                    )
+                )
+                group_vbox.addWidget(form_frame)
+                parent_layout.addWidget(group_box)
+                # Prevent garbage collection of objects
+                setattr(self, f"groupBox_{variable_name}", group_box)
+                setattr(self, f"verticalLayout_{variable_name}", group_vbox)
+                setattr(self, f"frame_{variable_name}", form_frame)
+                setattr(self, f"formLayout_{variable_name}", group_form)
+                # Recursively create settings UI for the field
+                self.createSettingsUI(
+                    getattr(parent, field.name), group_box, variable_name
+                )
+                continue
+            # Get the parent form layout (no form layout for self)
+            if parent_name is None:
+                continue
+            parent_form: QFormLayout = parent_widget.findChild(
+                QFormLayout, f"formLayout_{parent_name}"
+            )
+            settings_path = variable_name.replace("__", "/")
+            label = QLabel(parent=parent_widget, text=field.name.capitalize())
+            match field.type.__qualname__:
+                case str.__qualname__:
+                    data = QLineEdit(
+                        parent=parent_widget,
+                        text=self.get_setting(settings_path),
+                    )
+                case int.__qualname__:
+                    data = QSpinBox(parent=parent_widget)
+                    data.setValue(self.get_setting(settings_path))
+                    data.setKeyboardTracking(False)
+                    data.setRange(0, 10000)
+                    data.setSingleStep(1)
+                case bool.__qualname__:
+                    data = QCheckBox(parent=parent_widget)
+                    data.setChecked(self.get_setting(settings_path))
+                case List.__qualname__:
+                    data = QLineEdit(
+                        parent=parent_widget,
+                        text=", ".join(
+                            map(
+                                str.strip,
+                                self.settings.get_setting(settings_path),
                             )
-                        )
-                    case int.__qualname__:
-                        data = QSpinBox(parent=group_box)
-                        data.setValue(
-                            self.get_setting(field.name + "/" + subfield.name)
-                        )
-                        data.setObjectName(f"spinBox_{field.name}_{subfield.name}")
-                        data.valueChanged.connect(
-                            lambda: self.set_setting(
-                                field.name + "/" + subfield.name, data.value()
-                            )
-                        )
-                    case bool.__qualname__:
-                        data = QCheckBox(parent=group_box)
-                        data.setChecked(
-                            self.get_setting(field.name + "/" + subfield.name)
-                        )
-                        data.setObjectName(f"checkBox_{field.name}_{subfield.name}")
-                        data.toggled.connect(
-                            lambda: self.set_setting(
-                                field.name + "/" + subfield.name, data.isChecked()
-                            )
-                        )
-                    case List.__qualname__:
-                        data = QLineEdit(
-                            parent=group_box,
-                            text=", ".join(
-                                map(
-                                    str.strip,
-                                    self.settings.get_setting(
-                                        field.name + "/" + subfield.name
-                                    ),
-                                )
-                            ),
-                        )
-                        data.setObjectName(f"lineEdit_{field.name}_{subfield.name}")
-                        data.editingFinished.connect(
-                            lambda: self.set_setting(
-                                field.name + "/" + subfield.name,
-                                list(map(str.strip, data.text().split(","))),
-                            )
-                        )
-                    case _:
-                        self.parent.log(
-                            "warning",
-                            f"Unsupported type: {subfield.type} for {field.name}/{subfield.name}. Ignoring this field.",
-                        )
-                form_layout.setWidget(i, QFormLayout.ItemRole.LabelRole, label)
+                        ),
+                    )
+                case _:
+                    self.parent.log(
+                        "warning",
+                        f"Unsupported type: {field.type} for {settings_path}. Ignoring this field.",
+                    )
+            # Prevent garbage collection of objects
+            setattr(self, f"label_{variable_name}", label)
+            setattr(self, f"data_{variable_name}", data)
+            parent_form.addRow(label, data)
 
     def showEvent(self, event):
         super().showEvent(event)
         # Disable using 'Enter' to close the dialog
         self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setDefault(False)
         self.buttonBox.button(QDialogButtonBox.StandardButton.Cancel).setDefault(False)
+        # Update setting values
+        self.update_UI(self.settings)
 
     def get_available_settings(self) -> List[str]:
         """Get a list of available settings."""
@@ -208,10 +255,100 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
             for field in self.settings.get_available_settings():
                 settings.setValue(field, self.settings.get_setting(field))
 
+    def validate_settings(self, parent: "BaseSetting", parent_name: str = None):
+        try:
+            for field in dataclasses.fields(parent):
+                variable_name = (
+                    parent_name + "__" + field.name if parent_name else field.name
+                )
+                if isinstance(getattr(parent, field.name), BaseSetting):
+                    self.validate_settings(getattr(parent, field.name), variable_name)
+                    continue
+                # Get values from the UI and add to settings
+                settings_path = variable_name.replace("__", "/")
+                match field.type.__qualname__:
+                    case str.__qualname__:
+                        data = str(getattr(self, f"data_{variable_name}").text())
+                    case int.__qualname__:
+                        data = int(getattr(self, f"data_{variable_name}").value())
+                    case bool.__qualname__:
+                        data = bool(getattr(self, f"data_{variable_name}").isChecked())
+                    case List.__qualname__:
+                        data = list(
+                            map(
+                                str.strip,
+                                getattr(self, f"data_{variable_name}")
+                                .text()
+                                .split(","),
+                            )
+                        )
+                    case _:
+                        self.parent.log(
+                            "warning",
+                            f"Unsupported type: {field.type} for {settings_path}. Ignoring this field.",
+                        )
+                self.settings.set_setting(settings_path, data)
+            return True
+        except Exception as e:
+            self.parent.log(
+                "error",
+                f"Error validating settings: {e}\n",
+            )
+            return False
+
+    def update_UI(self, parent: "BaseSetting", parent_name: str = None):
+        """Update the UI with the current settings."""
+        try:
+            for field in dataclasses.fields(parent):
+                variable_name = (
+                    parent_name + "__" + field.name if parent_name else field.name
+                )
+                if isinstance(getattr(parent, field.name), BaseSetting):
+                    self.update_UI(getattr(parent, field.name), variable_name)
+                    continue
+                # Get values from the UI and add to settings
+                settings_path = variable_name.replace("__", "/")
+                value = self.settings.get_setting(settings_path)
+                match field.type.__qualname__:
+                    case str.__qualname__:
+                        data = getattr(self, f"data_{variable_name}")
+                        data.setText(str(value))
+                    case int.__qualname__:
+                        data = getattr(self, f"data_{variable_name}")
+                        data.setValue(int(value))
+                    case bool.__qualname__:
+                        data = getattr(self, f"data_{variable_name}")
+                        data.setChecked(bool(value))
+                    case List.__qualname__:
+                        data = getattr(self, f"data_{variable_name}")
+                        data.setText(", ".join(map(str.strip, value)))
+                    case _:
+                        self.parent.log(
+                            "warning",
+                            f"Unsupported type: {field.type} for {settings_path}. Ignoring this field.",
+                        )
+        except Exception as e:
+            self.parent.log(
+                "error",
+                f"Error resetting UI settings: {e}\n",
+            )
+
     def accept(self):
         """Override accept to save the settings and close the dialog."""
-        self.save_settings()
-        super().accept()
+        if self.validate_settings(self.settings):
+            self.save_settings()
+            super().accept()
+        else:
+            QMessageBox.warning(
+                self,
+                "Invalid Settings",
+                "Please esnure all fields are filled out correctly.",
+            )
+
+    def reject(self):
+        """Override reject to revert the UI settings and close the dialog."""
+        self.update_UI(self.settings)
+        super().reject()
 
 
 ## Settings Dataclasses

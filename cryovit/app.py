@@ -130,7 +130,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             sys.exit(1)
 
         self.setup_console()
-        self.settings.createSettingsUI()
         self.log("success", "Welcome to CryoViT!")
 
     @_catch_exceptions("preprocessing", concurrent=True)
@@ -1097,15 +1096,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if self.settings.get_setting("preset/available_presets")
             else []
         )
+        if not available_presets:
+            self.log("warning", "No available presets to load.")
+            return
         preset_dialog = PresetDialog(
             self,
             "Load preset",
             *available_presets,
             current_preset=self.settings.get_setting("preset/current_preset"),
+            load_preset=True,
         )
         result = preset_dialog.exec()
+        name = preset_dialog.result
         if result == preset_dialog.DialogCode.Accepted:
-            name = preset_dialog.result
             self.settings.set_setting(
                 "preset/available_presets", preset_dialog.get_presets()
             )
@@ -1118,8 +1121,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.settings.set_setting("preset/current_preset", name)
                 self.log("success", f"Loaded preset: {name}")
             else:
-                self.log("error", "No preset name specified.")
-            # Remove unused settings
+                self.settings.set_setting("preset/current_preset", "")
+                self.log("warning", "No preset name specified.")
+            # Remove unused presets
             unused_settings = set(available_presets) - set(
                 self.settings.get_setting("preset/available_presets")
             )
@@ -1182,11 +1186,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             for key in [
                 key
                 for key in self.settings.get_available_settings()
-                if key
-                not in [
-                    "preset/available_presets",
-                    "preset/current_preset",
-                ]
+                if not key.startswith("preset/")
             ]:
                 temp_settings.setValue(key, self.settings.get_setting(key))
             self.settings.set_setting("preset/current_preset", name)
@@ -1197,8 +1197,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Open the settings window."""
         result = self.settings.exec()
         if result == self.settings.DialogCode.Accepted:
-            self._setup_model_select()
-            self.settings.save_settings()
+            self.setup_model_select()
             self.log("success", "Settings saved.")
 
     def _show_hide_widgets(self, visible: bool, *widgets):
