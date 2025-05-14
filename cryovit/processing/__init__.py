@@ -11,10 +11,13 @@ from cryovit.processing.model import (
     get_model_configs,
     save_model,
     load_model,
+    load_base_model,
     get_dino_features,
     train_model,
     run_inference,
 )
+
+chimera_script_path = __file__.replace("__init__.py", "chimera_slices.py")
 
 __all__ = [
     "run_preprocess",
@@ -25,7 +28,9 @@ __all__ = [
     "get_model_configs",
     "save_model",
     "load_model",
+    "load_base_model",
     "get_dino_features",
     "train_model",
     "run_inference",
+    "chimera_script_path",
 ]
