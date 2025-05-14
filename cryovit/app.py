@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 from functools import partial
 import platform
+import traceback
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -46,6 +47,7 @@ class WorkerSignals(QObject):
 
     finish = pyqtSignal()
     progress = pyqtSignal(int, int)
+    error = pyqtSignal(tuple)
 
 
 class Worker(QRunnable):
@@ -61,32 +63,48 @@ class Worker(QRunnable):
 
     def run(self):
         """Run the function in the worker thread."""
-        if self.has_progress:
-            self.fn(*self.args, **self.kwargs, callback_fn=self.signals.progress.emit)
-        else:
-            self.fn(*self.args, **self.kwargs)
-        self.signals.finish.emit()
+        try:
+            if self.has_progress:
+                self.fn(
+                    *self.args, **self.kwargs, callback_fn=self.signals.progress.emit
+                )
+            else:
+                self.fn(*self.args, **self.kwargs)
+        except Exception:
+            exctype, value = sys.exc_info()[:2]
+            self.signals.error.emit((exctype, value, traceback.format_exc()))
+        finally:
+            self.signals.finish.emit()
 
 
 # Subclass QMainWindow to customize your application's main window
 class MainWindow(QMainWindow, Ui_MainWindow):
-    def _catch_exceptions(desc: str, concurrent: bool = True):
+    def _catch_exceptions(desc: str, concurrent: bool = False):
         """Decorator to catch exceptions when running any function."""
 
         def inner(func):
             def wrapper(self, *args, **kwargs):
                 try:
                     if concurrent and self.running:  # if not running in a thread
-                        sys.stderr.write(
+                        self.log(
+                            "warning"
                             f"Cannot run {desc}: Another process is already running."
                         )
                     return func(self, *args, **kwargs)
                 except Exception as e:
-                    sys.stderr.write(f"Error running {desc}: {e}")
+                    self.log("error", f"Error running {desc}: {e}")
 
             return wrapper
 
         return inner
+
+    def _handle_thread_exception(self, info, *args):
+        """Handle exceptions in worker threads."""
+        exctype, value, traceback_info = info
+        self.log(
+            "error",
+            f"Error in thread: {exctype}: {value}.\n{traceback_info}",
+        )
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -115,7 +133,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.settings.createSettingsUI()
         self.log("success", "Welcome to CryoViT!")
 
-    @_catch_exceptions("preprocessing")
+    @_catch_exceptions("preprocessing", concurrent=True)
     def run_preprocessing(self, is_train: bool, *args):
         self.running = True
 
@@ -145,6 +163,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 f"Invalid raw directory: {raw_dir}",
             )
+            self.running = False
             return
         if replace:
             replace_dir.setText(raw_dir)
@@ -153,6 +172,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if is_train:
             samples = self.sampleSelectCombo.getCurrentData()
+            self.preproc_completed = 0
+
+            def update_preproc_completed():
+                self.preproc_completed += 1
+                self._update_progress_bar(self.preproc_completed - 1, len(samples))
+                if self.preproc_completed == len(samples):
+                    on_finish()
+
             if samples:
                 src_dirs = [src_dir / sample for sample in samples]
                 for i, src_dir in enumerate(src_dirs):
@@ -162,12 +189,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                             f"Invalid raw directory: {src_dir}, skipping sample.",
                         )
                         continue
-                    run_preprocess(src_dir, dst_dir, **kwargs)
-                    self._update_progress_bar(i + 1, len(src_dirs))
+                    worker = Worker(
+                        run_preprocess,
+                        src_dir / samples[i],
+                        dst_dir / samples[i],
+                        has_progress=True if len(samples) == 1 else False,
+                        **kwargs,
+                    )
+                    if len(samples) == 1:
+                        worker.signals.progress.connect(self._update_progress_bar)
+                        worker.signals.finish.connect(on_finish)
+                    else:
+                        worker.signals.finish.connect(update_preproc_completed)
+                    worker.signals.error.connect(self._handle_thread_exception)
+                    self.threadpool.start(worker)
                 return
         worker = Worker(run_preprocess, src_dir, dst_dir, has_progress=True, **kwargs)
         worker.signals.progress.connect(self._update_progress_bar)
         worker.signals.finish.connect(on_finish)
+        worker.signals.error.connect(self._handle_thread_exception)
         self.threadpool.start(worker)
 
     @_catch_exceptions("ChimeraX")
@@ -269,7 +309,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             p.waitForFinished()
         self.log("success", "ChimeraX processing complete.")
 
-    @_catch_exceptions("generate training splits")
+    @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
         self.running = True
 
@@ -330,9 +370,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 worker.signals.finish.connect(on_finish)
             else:
                 worker.signals.finish.connect(update_samples_completed)
+            worker.signals.error.connect(self._handle_thread_exception)
             self.threadpool.start(worker)
 
-    @_catch_exceptions("generate new training splits")
+    @_catch_exceptions("generate new training splits", concurrent=True)
     def run_new_training_splits(self, *args):
         self.running = True
 
@@ -361,6 +402,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if result == QMessageBox.StandardButton.No:
+                self.running = False
                 return
 
         worker = Worker(
@@ -373,9 +415,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         worker.signals.progress.connect(self._update_progress_bar)
         worker.signals.finish.connect(on_finish)
+        worker.signals.error.connect(self._handle_thread_exception)
         self.threadpool.start(worker)
 
-    @_catch_exceptions("segmentation")
+    @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
         self.running = True
 
@@ -390,6 +433,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
             )
+            self.running = False
             return
         dino_dir = self.settings.get_setting("general/dino_dir")
         if not dino_dir:
@@ -397,6 +441,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 f"Invalid DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
             )
+            self.running = False
             return
         features_dir = self.settings.get_setting("general/features_dir")
         if not features_dir:
@@ -463,9 +508,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 worker.signals.finish.connect(on_finish)
             else:
                 worker.signals.finish.connect(update_segments_completed)
+            worker.signals.error.connect(self._handle_thread_exception)
             self.threadpool.start(worker)
 
-    @_catch_exceptions("training")
+    @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
         self.running = True
 
@@ -480,6 +526,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
             )
+            self.running = False
             return
         dino_dir = self.settings.get_setting("general/dino_dir")
         if not dino_dir:
@@ -487,6 +534,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 f"Invalid DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
             )
+            self.running = False
             return
         features_dir = self.settings.get_setting("general/features_dir")
         if not features_dir:
@@ -500,6 +548,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "error",
                 "No model selected. Please select a model in the 'Training' section in the 'Train Model' tab.",
             )
+            self.running = False
             return
 
         # Get directories
@@ -540,6 +589,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         worker = Worker(run_all, has_progress=True)
         worker.signals.progress.connect(self._update_progress_bar)
         worker.signals.finish.connect(on_finish)
+        worker.signals.error.connect(self._handle_thread_exception)
         self.threadpool.start(worker)
 
     def setup_console(self):
@@ -1171,7 +1221,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Get timestamp
         timestamp_str = "{}> ".format(time.strftime("%X"))
         # Format text with colors and timestamp
-        full_text = timestamp_str + text
+        full_text = timestamp_str + text + end
         match mode:
             case "error":
                 full_text = '<font color="#FF4500">{}</font>'.format(full_text)
@@ -1181,9 +1231,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 full_text = '<font color="#32CD32">{}</font>'.format(full_text)
             case _:
                 full_text = '<font color="white">{}</font>'.format(full_text)
+        # Add line breaks in HTML
+        full_text = full_text.replace("\n", "<br>")
         # Write to console ouptut
         self.consoleText.insertHtml(full_text)
-        self.consoleText.insertPlainText(end)
 
     def closeEvent(self, event):
         """Override close event to save settings."""
