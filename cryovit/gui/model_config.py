@@ -90,7 +90,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
             self.config.params = {
                 p["name"]: p["value"] for p in self.param_dict if p["name"]
             }
-            self.config.samples = map(str.strip, self.samplesDisplay.text().split(","))
+            self.config.samples = list(map(str.strip, self.samplesDisplay.text().split(","))) if self.samplesDisplay.text() else []
             if not self.config.samples:
                 raise ValueError("Samples cannot be empty.")
             self.config.metrics = {
@@ -105,11 +105,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
                 self.trainer_config.log_every_n_steps = self.loggingSpin.value()
             return True
         except Exception as e:
-            QMessageBox.critical(
-                self,
-                "Error",
-                f"Error validating configuration: {e}\n",
-            )
+            self.parent.log("error", f"Error validating configuration: {e}")
             return False
 
     def accept(self):

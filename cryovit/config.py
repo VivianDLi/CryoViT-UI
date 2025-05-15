@@ -336,7 +336,7 @@ class InterfaceModelConfig:
     label_key: str
     model_type: ModelArch
     model_params: Dict[str, Union[str, int, float]]
-    samples: Union[str, List[str]]  # list of samples used for training
+    samples: List[str]  # list of samples used for training
     metrics: Dict[str, float]
 
 

@@ -29,7 +29,7 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QDesktopServices
 
-from config import InterfaceModelConfig, ModelArch, models
+from cryovit.config import InterfaceModelConfig, ModelArch, models
 import cryovit.gui.resources
 from cryovit.gui.layouts.mainwindow import Ui_MainWindow
 from cryovit.gui.model_config import ModelDialog, TrainerFit
@@ -169,8 +169,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         src_dir = Path(raw_dir)
         dst_dir = Path(replace_dir.text())
 
-        if is_train:
-            samples = self.sampleSelectCombo.getCurrentData()
+        samples = self.sampleSelectCombo.getCurrentData()
+
+        if is_train and samples:
             self.preproc_completed = 0
 
             def update_preproc_completed():
@@ -179,30 +180,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if self.preproc_completed == len(samples):
                     on_finish()
 
-            if samples:
-                src_dirs = [src_dir / sample for sample in samples]
-                for i, src_dir in enumerate(src_dirs):
-                    if not os.path.isdir(src_dir):
-                        self.log(
-                            "warning",
-                            f"Invalid raw directory: {src_dir}, skipping sample.",
-                        )
-                        continue
-                    worker = Worker(
-                        run_preprocess,
-                        src_dir / samples[i],
-                        dst_dir / samples[i],
-                        has_progress=True if len(samples) == 1 else False,
-                        **kwargs,
+            for sample in samples:
+                if not os.path.isdir(src_dir / sample):
+                    self.log(
+                        "warning",
+                        f"Invalid raw directory: {src_dir / sample}, skipping sample.",
                     )
-                    if len(samples) == 1:
-                        worker.signals.progress.connect(self._update_progress_bar)
-                        worker.signals.finish.connect(on_finish)
-                    else:
-                        worker.signals.finish.connect(update_preproc_completed)
-                    worker.signals.error.connect(self._handle_thread_exception)
-                    self.threadpool.start(worker)
-                return
+                    continue
+                worker = Worker(
+                    run_preprocess,
+                    src_dir / sample,
+                    dst_dir / sample,
+                    has_progress=True if len(samples) == 1 else False,
+                    **kwargs,
+                )
+                if len(samples) == 1:
+                    worker.signals.progress.connect(self._update_progress_bar)
+                    worker.signals.finish.connect(on_finish)
+                else:
+                    worker.signals.finish.connect(update_preproc_completed)
+                worker.signals.error.connect(self._handle_thread_exception)
+                self.threadpool.start(worker)
+            return
         worker = Worker(run_preprocess, src_dir, dst_dir, has_progress=True, **kwargs)
         worker.signals.progress.connect(self._update_progress_bar)
         worker.signals.finish.connect(on_finish)
@@ -212,7 +211,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     @_catch_exceptions("ChimeraX")
     def run_chimerax(self, *args):
         chimerax_path = self.settings.get_setting("annotation/chimerax_path")
-        if not chimerax_path:
+        if not chimerax_path and platform.system().lower() != "linux":
             self.log(
                 "error",
                 "ChimeraX path not set. Please set it in the settings.",
@@ -220,93 +219,151 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # Get arguments from settings
-        raw_dir = self.rawDirectory.text()
-        replace_proc = self.replaceCheckboxProc.isChecked()
-        replace_proc_dir = self.replaceDirectoryProc
-        src_dir = Path(replace_proc_dir.text() if replace_proc else raw_dir)
         samples = self.sampleSelectCombo.getCurrentData()
-        src_dirs = [src_dir / sample for sample in samples] if samples else [src_dir]
-        dst_dir = (
-            Path(self.sliceDirectory.text()) if self.sliceDirectory.text() else None
-        )
-        dst_dirs = (
-            [dst_dir / sample for sample in samples]
-            if samples and dst_dir
-            else [dst_dir]
-        )
-        csv_dir = self.csvDirectory.text() if self.csvDirectory.text() else None
-        num_slices = self.settings.get_setting("annotation/num_slices")
+        raw_dir = self.rawDirectoryTrain.text()
+        replace_proc = self.replaceCheckboxProcTrain.isChecked()
+        replace_proc_dir = self.replaceDirectoryProcTrain.text()
+        src_dir = Path(raw_dir if replace_proc else replace_proc_dir)
+        if self.sliceDirectory.text():
+            dst_dir = Path(self.sliceDirectory.text())
+        else:
+            dst_dir = (
+                src_dir.resolve() / "slices"
+                if samples
+                else src_dir.parent.resolve() / "slices"
+            )
+            self.log(
+                "warning",
+                f"No slice directory specified. Slices will be saved in {src_dir.resolve() / 'slices/sample' if samples else src_dir.parent.resolve() / 'slices'}.",
+            )
+        if self.csvDirectory.text():
+            csv_dir = Path(self.csvDirectory.text())
+        else:
+            csv_dir = (
+                src_dir.parent.resolve() / "csv"
+                if samples
+                else src_dir.parent.parent.resolve() / "csv"
+            )
+            self.log(
+                "warning",
+                f"No CSV directory specified. CSV files will be saved in {src_dir.parent.resolve() / 'csv' if samples else src_dir.parent.parent.resolve() / 'csv'}.",
+            )
 
-        for i in range(len(samples)):
-            # Check for valid directories
-            if not os.path.isdir(src_dirs[i]):
+        num_slices = self.settings.get_setting("annotation/num_slices")
+        # Check for no samples
+        if not samples:
+            if not os.path.isdir(src_dir):
                 self.log(
                     "error",
-                    f"Invalid raw directory: {src_dirs[i]}",
+                    f"Invalid raw directory: {src_dir}",
                 )
-                continue
-            p = QProcess()
-            # Check for OS type
-            match platform.system().lower():
-                case (
-                    "windows"
-                ):  # Needs to create a shortcut to launch with scripts, so instead launches normally
-                    import subprocess
-
-                    # Copy command to clipboard
-                    command = "start slice labels" + " ".join(
-                        [
-                            f"{src_dirs[i]}",
-                            f"{samples[i]}",
-                            "--dst_dir",
-                            f"{dst_dirs[i]}",
-                            "--csv_dir",
-                            f"{csv_dir}",
-                            "--num_slices",
-                            str(num_slices),
-                        ]
+                return
+            self.running = True
+            self._launch_chimerax(
+                chimerax_path,
+                src_dir,
+                dst_dir=dst_dir,
+                csv_dir=csv_dir,
+                num_slices=num_slices,
+            )
+            if self.chimera_process:
+                self.chimera_process.waitForFinished(-1)
+                self.chimera_process = None
+        else:
+            self.running = True
+            for i in range(len(samples)):
+                # Check for valid directories
+                if not os.path.isdir(src_dir / samples[i]):
+                    self.log(
+                        "error",
+                        f"Invalid raw directory: {src_dir / samples[i]}",
                     )
-                    subprocess.run("echo " + command + " | clip", shell=False)
-                    # Launch ChimeraX normally
-                    p.start(chimerax_path)
-                case "linux":  # Has chimerax from command line
-                    p.start(
-                        "chimerax",
-                        [
-                            "--script",
-                            chimera_script_path,
-                            src_dirs[i],
-                            samples[i],
-                            "--dst_dir",
-                            dst_dirs[i],
-                            "--csv_dir",
-                            csv_dir,
-                            "--num_slices",
-                            str(num_slices),
-                        ],
+                    continue
+                self._launch_chimerax(
+                    chimerax_path if chimerax_path else "",
+                    src_dir,
+                    samples[i],
+                    dst_dir=dst_dir,
+                    csv_dir=csv_dir,
+                    num_slices=num_slices,
+                )
+                if self.chimera_process:
+                    self.chimera_process.waitForFinished(-1)
+                    self._update_progress_bar(i, len(samples))
+                    self.chimera_process = None
+                else:
+                    self.log(
+                        "warning",
+                        f"ChimeraX process for src_dir: {src_dir / samples[i]} failed.",
                     )
-                    p.waitForFinished()
-                case "darwin":  # Needs to be run from a specific path
-                    p.start(
-                        chimerax_path,
-                        [
-                            "--script",
-                            chimera_script_path,
-                            src_dirs[i],
-                            samples[i],
-                            "--dst_dir",
-                            dst_dirs[i],
-                            "--csv_dir",
-                            csv_dir,
-                            "--num_slices",
-                            str(num_slices),
-                        ],
-                    )
-                case _:
-                    self.log("error", f"Unsupported OS type {platform.system()}.")
-                    break
-            p.waitForFinished()
+                    continue
+        self.running = False
         self.log("success", "ChimeraX processing complete.")
+
+    def _launch_chimerax(
+        self,
+        chimerax_path: str,
+        src_dir: Path,
+        sample: str = None,
+        dst_dir: Path = None,
+        csv_dir: Path = None,
+        num_slices: int = 5,
+    ):
+        import subprocess
+
+        self.chimera_process = QProcess()
+        # Create script args
+        commands = [
+            "open",
+            chimera_script_path,
+            ";",
+            "start slice labels",
+            "'" + str(src_dir.resolve()) + "'",
+        ]
+        if sample:
+            commands.append("'" + str(sample) + "'")
+        if dst_dir:
+            commands.extend(["dst_dir", "'" + str(dst_dir.resolve()) + "'"])
+        if csv_dir:
+            commands.extend(["csv_dir", "'" + str(csv_dir.resolve()) + "'"])
+        commands.extend(["num_slices", str(num_slices)])
+        # Command to run chimera_slices and start slice labels
+        command = " ".join(commands)
+        # Check for OS type
+        match platform.system().lower():
+            case "windows":  # Needs to be run from a specific path
+                # Check for valid path
+                if not os.path.isfile(
+                    chimerax_path
+                ) or not chimerax_path.lower().endswith("chimerax.exe"):
+                    self.log(
+                        "error",
+                        f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.exe executable typically found in 'C:/Program Files/ChimeraX/bin/ChimeraX.exe'. Please set it in the settings.",
+                    )
+                    return None
+                # Copy command to clipboard
+                subprocess.check_call("echo " + command + " | clip", shell=True)
+                # Launch ChimeraX normally
+                self.chimera_process.start(chimerax_path)
+            case "linux":  # Has chimerax from command line
+                # Copy command to clipboard
+                subprocess.check_call("echo " + command + " | xsel -ib", shell=True)
+                self.chimera_process.start("chimerax")
+            case "darwin":  # Needs to be run from a specific path
+                if not os.path.isfile(
+                    chimerax_path
+                ) or not chimerax_path.lower().endswith("chimerax.app"):
+                    self.log(
+                        "error",
+                        f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.app application typically found in '/Applications/ChimeraX.app'. Please set it in the settings.",
+                    )
+                    return None
+                # Copy command to clipboard
+                subprocess.check_call("echo " + command + " | pbcopy", shell=True)
+                self.chimera_process.start(chimerax_path)
+            case _:
+                self.log("error", f"Unsupported OS type {platform.system()}.")
+        return self.chimera_process
 
     @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
@@ -648,7 +705,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sampleSelectCombo.setObjectName(old_combo.objectName())
         self.sampleSelectCombo.setToolTip(old_combo.toolTip())
         self.sampleSelectCombo.setPlaceholderText(old_combo.placeholderText())
-        self.sampleAdd.clicked.connect(lambda: self.sampleSelectCombo.addNewItem)
+        self.sampleSelectLayout.replaceWidget(old_combo, self.sampleSelectCombo)
+        old_combo.deleteLater()
+
+        self.sampleAdd.clicked.connect(self._add_sample)
+
+    @_catch_exceptions("update sample select")
+    def _add_sample(self, *args):
+        """Add a new sample to the sample list."""
+        self.sampleSelectCombo.addNewItem()
 
     def setup_model_select(self):
         # Setup model cache
@@ -731,8 +796,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QLabel(
                 parent=contents,
                 text=(
-                    model_config.samples
-                    if isinstance(model_config.samples, str)
+                    "".join(model_config.samples)
+                    if len(model_config.samples) < 2
                     else ", ".join(model_config.samples)
                 ),
             ),
@@ -1033,11 +1098,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     @_catch_exceptions("update training model architecture")
     def _update_train_model_arch(self, text: str, *args):
         if not self.train_model_config:
-            self.log(
-                "error",
-                "No model selected. Please select a model in the 'Training' section.",
+            samples = self.sampleSelectCombo.getCurrentData()
+            self.train_model_config = InterfaceModelConfig(
+                name=text.lower(),
+                label_key="",
+                model_type=ModelArch[text],
+                model_params={},
+                samples=samples,
+                metrics={},
             )
-            return
         self.train_model_config.model_type = ModelArch[text]
         self.train_model = load_base_model(self.train_model_config)
 
@@ -1064,6 +1133,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if config_dialog.result() == config_dialog.DialogCode.Accepted:
             self.train_model_config = config_dialog.config
             self.trainer_config = config_dialog.trainer_config
+            self.sampleSelectCombo.setCurrentData(self.train_model_config.samples)
             self.log("success", "Training configuration updated.")
 
     def setup_run_buttons(self):

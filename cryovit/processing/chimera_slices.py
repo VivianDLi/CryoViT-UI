@@ -68,16 +68,18 @@ def set_tomogram_slices(
 
     global src_path, dst_path, csv_path, slice_n, files, file_n, csv_data
 
+    # Check for .png dst folder
+    if dst_dir:
+        dst_path = Path(dst_dir).resolve()
+    else:
+        dst_path = Path(src_dir).parent.resolve() / "slices"
+
     if sample:
         src_path = Path(src_dir).resolve() / sample
     else:
         src_path = Path(src_dir).resolve()
         sample = src_path.name
-    # Check for .png dst folder
-    if dst_dir:
-        dst_path = Path(dst_dir).resolve()
-    else:
-        dst_path = Path(src_dir).parent.resolve() / "slices" / sample
+    dst_path = dst_path / sample
     # Create destination directory if it doesn't exist
     os.makedirs(dst_path, exist_ok=True)
     # Check for .csv file
@@ -194,55 +196,3 @@ After running 'start slice labels', use plane markers to select slices and z-lim
 """
 )
 register_commands(session.logger)
-
-# Setup launching ChimeraX from the command line with script arguments
-import argparse
-
-parser = argparse.ArgumentParser(
-    description="ChimeraX script to select tomogram slices to label and set-up min and max z-values for annotation and export slices as pngs in ChimeraX.",
-)
-parser.add_argument(
-    "src_dir",
-    type=str,
-    help="Source directory of tomograms. If a sample name is provided, it will be used as the subdirectory (e.g., 'src_dir/sample').",
-)
-parser.add_argument(
-    "sample",
-    type=str,
-    default=None,
-    help="Optional sample name to use as subdirectory. If not provided, the script will take the sample to be the name of the src_dir.",
-)
-parser.add_argument(
-    "--dst_dir",
-    dest="dst_dir",
-    type=str,
-    default=None,
-    help="Directory for saving slices. If not provided, defaults to '/slices/sample' in the parent directory of src_dir.",
-)
-parser.add_argument(
-    "--csv_dir",
-    dest="csv_dir",
-    type=str,
-    default=None,
-    help="Directory for saving the .csv file. If not provided, defaults to '/csv' in the parent directory of src_dir. The .csv file will be named 'sample.csv'.",
-)
-parser.add_argument(
-    "--num_slices",
-    dest="num_slices",
-    type=int,
-    default=5,
-    help="Number of slices to label. Default is 5.",
-)
-args = parser.parse_args()
-if args.src_dir:
-    session.logger.info(
-        "Detected command line arguments. Running script with arguments."
-    )
-    set_tomogram_slices(
-        session,
-        args.src_dir,
-        sample=args.sample,
-        dst_dir=args.dst_dir,
-        csv_dir=args.csv_dir,
-        num_slices=args.num_slices,
-    )

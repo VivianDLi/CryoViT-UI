@@ -1,10 +1,9 @@
 """Functions and classes for miscellaneous GUI utilities."""
 
-import sys
 from typing import List, Union
 
 from PyQt6.QtCore import Qt, QObject, QEvent, pyqtSignal
-from PyQt6.QtGui import QFontMetrics, QStandardItem
+from PyQt6.QtGui import QFontMetrics, QStandardItem, QMouseEvent
 from PyQt6.QtWidgets import (
     QFileDialog,
     QInputDialog,
@@ -45,50 +44,51 @@ class MultiSelectComboBox(QComboBox):
         self.setItemDelegate(MultiSelectComboBox.CustomDelegate())
 
         self.popupOpened = False
-        # Setup event handlers
-        self.lineEdit().installEventFilter(self)
+
+        # event handlers
         self.view().viewport().installEventFilter(self)
+        self.lineEdit().installEventFilter(self)
+        self.model().dataChanged.connect(self.updateText)
 
     def resizeEvent(self, event) -> None:
         """Override resizeEvent to also adjust display text."""
-        self.updateText()
         super().resizeEvent(event)
+        self.updateText()
 
     def showEvent(self, event) -> None:
         """Override showEvent to also adjust display text."""
-        self.updateText()
         super().showEvent(event)
+        self.updateText()
 
-    def eventFilter(self, obj, event) -> bool:
-        """Override events to handle mouse button release events and disable closing on click."""
-        # Click on the display line
-        if obj == self.lineEdit() and event.type() == QEvent.Type.MouseButtonPress:
-            if not self.popupOpened:
-                self.showPopup()
+    def eventFilter(self, source: QObject, event: QEvent) -> bool:
+        """Override eventFilter to handle mouse right-click events (ignored by QComboBox), selection, and open dropdown."""
+        if (
+            event.type() == QEvent.Type.MouseButtonRelease
+            and source == self.view().viewport()
+        ):
+            mouse_event: QMouseEvent = event
+            # Select items from the popup menu
+            if mouse_event.button() == Qt.MouseButton.LeftButton:
+                index = self.view().indexAt(event.pos())
+                item = self.model().item(index.row())
+                if item.checkState() == Qt.CheckState.Checked:
+                    item.setCheckState(Qt.CheckState.Unchecked)
+                else:
+                    item.setCheckState(Qt.CheckState.Checked)
+                return True
+            # Remove items from the popup menu
+            if mouse_event.button() == Qt.MouseButton.RightButton:
+                index = self.view().indexAt(event.pos())
+                self.model().removeRows(index.row(), 1)
+                return True
             else:
+                return False
+        if event.type() == QEvent.Type.MouseButtonRelease and source == self.lineEdit():
+            mouse_event: QMouseEvent = event
+            if self.popupOpened:
                 self.hidePopup()
-            return True
-        # Select items on the popup menu
-        if (
-            obj == self.view().viewport()
-            and event.type() == QEvent.Type.MouseButtonRelease
-            and event.button() == Qt.MouseButton.LeftButton
-        ):
-            index = self.view().indexAt(event.position().toPoint())
-            item = self.model().itemFromIndex(index)
-            if item.checkState() == Qt.CheckState.Checked:
-                item.setCheckStaete(Qt.CheckState.Unchecked)
             else:
-                item.setCheckState(Qt.CheckState.Checked)
-            return True
-        # Remove items from the popup menu
-        if (
-            obj == self.view().viewport()
-            and event.type() == QEvent.Type.MouseButtonRelease
-            and event.button() == Qt.MouseButton.RightButton
-        ):
-            index = self.view().indexAt(event.position().toPoint())
-            self.removeItem(index)
+                self.showPopup()
             return True
         return False
 
@@ -96,11 +96,13 @@ class MultiSelectComboBox(QComboBox):
         texts = self.getCurrentData()
         if texts:
             text = ", ".join(texts)
-        metrics = QFontMetrics(self.lineEdit().font())
-        elidedText = metrics.elidedText(
-            text, Qt.TextElideMode.ElideRight, self.lineEdit().width()
-        )
-        self.lineEdit().setText(elidedText)
+            metrics = QFontMetrics(self.lineEdit().font())
+            elidedText = metrics.elidedText(
+                text, Qt.TextElideMode.ElideRight, self.lineEdit().width()
+            )
+            self.lineEdit().setText(elidedText)
+        else:
+            self.lineEdit().setText("")
 
     def addItem(self, text: str) -> None:
         """Add an item to the combo box."""
@@ -157,6 +159,24 @@ class MultiSelectComboBox(QComboBox):
             if self.model().item(i).checkState() == Qt.CheckState.Checked
         ]
 
+    def setCurrentData(self, data: List[str]) -> None:
+        """Set the selected items based on the provided data.
+
+        Args:
+            data (list): A list of strings to select.
+        """
+        available_data = [
+            self.model().item(i).text() for i in range(self.model().rowCount())
+        ]
+        indices = []
+        for d in data:
+            if d not in available_data:
+                self.addItem(d)
+                indices.append(self.model().rowCount() - 1)
+            else:
+                indices.append(available_data.index(d))
+        self.setCurrentIndexes(indices)
+
     def showPopup(self) -> None:
         """Show the popup menu."""
         super().showPopup()
@@ -165,6 +185,10 @@ class MultiSelectComboBox(QComboBox):
     def hidePopup(self) -> None:
         """Hide the popup menu."""
         super().hidePopup()
+        self.startTimer(100)  # add cooldown to prevent double open and spam
+
+    def timerEvent(self, event) -> None:
+        self.killTimer(event.timerId())
         self.popupOpened = False
 
 

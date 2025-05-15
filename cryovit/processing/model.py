@@ -19,7 +19,6 @@ from pytorch_lightning.callbacks import BasePredictionWriter
 
 from cryovit.datasets import TomoDataset, VITDataset
 from cryovit.models.base_model import BaseModel
-from cryovit.models import CryoVIT, UNet3D
 from cryovit.run.dino_features import (
     dino_model,
     dino_features,
@@ -28,6 +27,8 @@ from cryovit.run.dino_features import (
 from cryovit.config import (
     DataLoader,
     InterfaceModelConfig,
+    CryoVIT,
+    UNet3D,
     Trainer,
     TrainerFit,
     MultiSample,
@@ -160,12 +161,13 @@ def load_base_model(model_config: InterfaceModelConfig) -> BaseModel:
     """
     match model_config.model_type:
         case ModelArch.CRYOVIT:
-            model = CryoVIT(**model_config.model_params)
+            model_config = CryoVIT(**model_config.model_params)
         case ModelArch.UNET3D:
-            model = UNet3D(**model_config.model_params)
+            model_config = UNet3D(**model_config.model_params)
+
         case _:
             logger.error(f"Unknown model type: {model_config.model_type}")
-    return model
+    return instantiate(model_config)
 
 
 def get_dino_features(
@@ -269,7 +271,7 @@ def train_model(
         "aux_keys": ["data"],
     }
     datamodule = instantiate(
-        MultiSample(sample=tuple(model_config.samples, split_id=split_id))
+        MultiSample(sample=tuple(model_config.samples), split_id=split_id)
     )(
         split_file=split_file,
         dataloader_fn=instantiate(DataLoader(batch_size=batch_size)),
