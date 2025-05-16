@@ -5,6 +5,7 @@ import sys
 import logging
 from pathlib import Path
 
+from tqdm import tqdm
 from h5py import File
 import numpy as np
 import torch
@@ -45,7 +46,6 @@ def run_preprocess(
     bin_size: int = 2,
     normalize: bool = True,
     clip: bool = True,
-    callback_fn: callable = None,
 ) -> None:
     """Pre-process raw tomogram data.
 
@@ -55,13 +55,12 @@ def run_preprocess(
         bin_size (int, optional): Number of tomogram slice to combine. Defaults to 2.
         normalize (bool, optional): Whether to normalize tomogram values. Defaults to True.
         clip (bool, optional): Whether to clip normalized values to +/- 3 std devs. Defaults to True.
-        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     files = list(
         p.resolve() for p in src_dir.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
     )
     logger.info(f"Found {len(files)} files in {src_dir}.")
-    for i, file_name in enumerate(files):
+    for file_name in tqdm(files, desc="Pre-processing tomograms"):
         logger.debug(f"Processing {file_name}.")
         # load tomogram
         with File(file_name, "r") as fh:
@@ -84,4 +83,3 @@ def run_preprocess(
             if "data" in fh:
                 del fh["data"]
             fh.create_dataset("data", data=data)
-        callback_fn(i, len(files)) if callback_fn else None

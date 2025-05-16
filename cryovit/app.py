@@ -27,7 +27,7 @@ from PyQt6.QtCore import (
     QObject,
     pyqtSignal,
 )
-from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtGui import QDesktopServices, QGuiApplication
 
 from cryovit.config import InterfaceModelConfig, ModelArch, models
 import cryovit.gui.resources
@@ -46,30 +46,23 @@ class WorkerSignals(QObject):
     """Signals for worker threads."""
 
     finish = pyqtSignal()
-    progress = pyqtSignal(int, int)
     error = pyqtSignal(tuple)
 
 
 class Worker(QRunnable):
     """Worker thread for running tasks in the background."""
 
-    def __init__(self, fn, *args, has_progress: bool = False, **kwargs):
+    def __init__(self, fn, *args, **kwargs):
         super().__init__()
         self.fn = fn
         self.args = args
         self.kwargs = kwargs
-        self.has_progress = has_progress
         self.signals = WorkerSignals()
 
     def run(self):
         """Run the function in the worker thread."""
         try:
-            if self.has_progress:
-                self.fn(
-                    *self.args, **self.kwargs, callback_fn=self.signals.progress.emit
-                )
-            else:
-                self.fn(*self.args, **self.kwargs)
+            self.fn(*self.args, **self.kwargs)
         except Exception:
             exctype, value = sys.exc_info()[:2]
             self.signals.error.emit((exctype, value, traceback.format_exc()))
@@ -85,18 +78,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         def inner(func):
             def wrapper(self, *args, **kwargs):
                 try:
-                    if concurrent and self.running:  # if not running in a thread
+                    if (
+                        concurrent and self.threadpool.activeThreadCount() > 0
+                    ):  # if not running in a thread
                         self.log(
                             "warning"
                             f"Cannot run {desc}: Another process is already running."
                         )
-                    result = func(self, *args, **kwargs)
-                    if concurrent and not result:
-                        # A function creating threads has exited early
-                        self.running = False
+                    func(self, *args, **kwargs)
+                    if concurrent and self.threadpool.activeThreadCount() > 0:
+                        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
                 except Exception as e:
-                    if concurrent:
-                        self.running = False
                     self.log("error", f"Error running {desc}: {e}")
 
             return wrapper
@@ -111,14 +103,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             f"Error in thread: {exctype}: {value}.\n{traceback_info}",
         )
 
+    def _on_thread_finish(self, name: str, *args):
+        """Handle thread finish signal and update progress bar."""
+        self.progress_dict[name]["count"] += 1
+        count, total = (
+            self.progress_dict[name]["count"],
+            self.progress_dict[name]["total"],
+        )
+        self._update_progress_bar(count, total)
+        if count >= total:
+            QGuiApplication.restoreOverrideCursor()
+            self.log("success", f"{name} complete.")
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
         # Setup settings
         self.settings = SettingsWindow(self)
         # Setup thread pool
-        self.running = False  # Flag to check if a process is running
-        self.threadpool = QThreadPool()
+        self.threadpool: QThreadPool = QThreadPool.globalInstance()
+        self.progress_dict = {}
 
         # Setup UI elements
         try:
@@ -130,27 +134,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.setup_folder_selects()
             self.setup_run_buttons()
             self.setup_menu()
+            self.setup_console()
         except Exception as e:
             sys.stderr.write(f"Error setting up UI: {e}")
             sys.exit(1)
-
-        self.setup_console()
         self.log("success", "Welcome to CryoViT!")
 
     @_catch_exceptions("preprocessing", concurrent=True)
-    def run_preprocessing(self, is_train: bool, *args) -> bool:
-        self.running = True
-
-        def on_finish():
-            self.running = False
-            self.log("success", "Preprocessing complete.")
-
-        def on_partial_finish(total: int):
-            self.preproc_completed += 1
-            self._update_progress_bar(self.preproc_completed - 1, total)
-            if self.preproc_completed == total:
-                on_finish()
-
+    def run_preprocessing(self, is_train: bool, *args):
         # Get optional kwargs from settings
         kwargs = {
             "bin_size": self.settings.get_setting("preprocessing/bin_size"),
@@ -170,18 +161,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             src_dir = Path(raw_dir.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
-            return False
+            return
         if replace:
             replace_dir.setText(str(src_dir))
         if replace_dir.text():
             dst_dir = Path(replace_dir.text()).resolve()
         else:
             self.log("warning", "No replace directory specified.")
-            return False
+            return
 
-        if is_train:
-            samples = self.sampleSelectCombo.getCurrentData()
-            self.preproc_completed = 0
+        finish_callback = partial(self._on_thread_finish, "Preprocessing")
+        self.progress_dict["Preprocessing"] = {"count": 0, "total": 0}
+        # Check for samples
+        samples = self.sampleSelectCombo.getCurrentData()
+        if is_train and samples:
+            self.progress_dict["Preprocessing"]["total"] = len(samples)
             for sample in samples:
                 if not os.path.isdir(src_dir / sample):
                     self.log(
@@ -193,42 +187,32 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     run_preprocess,
                     src_dir / sample,
                     dst_dir / sample,
-                    has_progress=True if len(samples) == 1 else False,
                     **kwargs,
                 )
-                if len(samples) == 1:
-                    worker.signals.progress.connect(self._update_progress_bar)
-                    worker.signals.finish.connect(on_finish)
-                else:
-                    worker.signals.finish.connect(on_partial_finish)
+                worker.signals.finish.connect(finish_callback)
                 worker.signals.error.connect(self._handle_thread_exception)
                 self.threadpool.start(worker)
-            return True
         else:
             if not os.path.isdir(src_dir):
                 self.log(
                     "error",
                     f"Invalid raw directory: {src_dir}.",
                 )
-                return False
-            worker = Worker(
-                run_preprocess, src_dir, dst_dir, has_progress=True, **kwargs
-            )
-            worker.signals.progress.connect(self._update_progress_bar)
-            worker.signals.finish.connect(on_finish)
+                return
+            worker = Worker(run_preprocess, src_dir, dst_dir, **kwargs)
+            worker.signals.finish.connect(finish_callback)
             worker.signals.error.connect(self._handle_thread_exception)
             self.threadpool.start(worker)
-            return True
 
     @_catch_exceptions("ChimeraX")
-    def run_chimerax(self, *args) -> bool:
+    def run_chimerax(self, *args):
         chimerax_path = self.settings.get_setting("annotation/chimerax_path")
         if not chimerax_path and platform.system().lower() != "linux":
             self.log(
                 "warning",
                 "ChimeraX path not set. Please set it in the settings.",
             )
-            return False
+            return
 
         # Get directories from settings
         samples = self.sampleSelectCombo.getCurrentData()
@@ -236,7 +220,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
-            return False
+            return
         if self.sliceDirectory.text():
             dst_dir = Path(self.sliceDirectory.text()).resolve()
         else:
@@ -271,8 +255,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     "error",
                     f"Invalid raw directory: {src_dir}.",
                 )
-                return False
-            self.running = True
+                return
             self._launch_chimerax(
                 chimerax_path,
                 src_dir,
@@ -284,7 +267,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.chimera_process.waitForFinished(-1)
                 self.chimera_process = None
         else:
-            self.running = True
             for i in range(len(samples)):
                 # Check for valid directories
                 if not os.path.isdir(src_dir / samples[i]):
@@ -311,9 +293,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         f"ChimeraX process for src_dir: {src_dir / samples[i]} failed.",
                     )
                     continue
-        self.running = False
         self.log("success", "ChimeraX processing complete.")
-        return True
 
     def _launch_chimerax(
         self,
@@ -381,66 +361,24 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         return self.chimera_process
 
     @_catch_exceptions("generate training splits", concurrent=True)
-    def run_generate_training_splits(self, *args) -> bool:
-        self.running = True
-
-        def on_finish():
-            self.running = False
-            self.log("success", "Generate training splits complete.")
-
-        def on_partial_finish(total: int):
-            self.splits_completed += 1
-            self._update_progress_bar(self.splits_completed - 1, total)
-            if self.splits_completed == total:
-                on_finish()
-
-        def run_both(
-            src_dir,
-            dst_dir,
-            annot_dir,
-            csv_dir,
-            features,
-            csv_file,
-            sample,
-            num_splits,
-            seed,
-            callback_fn: callable = None,
-        ):
-            add_annotations(
-                src_dir=src_dir,
-                dst_dir=dst_dir,
-                annot_dir=annot_dir,
-                csv_file=csv_file,
-                features=features,
-                callback_fn=callback_fn,
-            )
-
-            add_splits(
-                dst_dir=csv_dir,
-                csv_file=csv_file,
-                sample=sample,
-                num_splits=num_splits,
-                seed=seed,
-                callback_fn=callback_fn,
-            )
-
+    def run_generate_training_splits(self, *args):
         # Get directories from settings
         samples = self.sampleSelectCombo.getCurrentData()
         if self.dataDirectoryTrain.text():
             src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
-            return False
+            return
         if self.annoDirectory.text():
             annot_dir = Path(self.annoDirectory.text()).resolve()
         else:
             self.log("warning", "No annotation directory specified.")
-            return False
+            return
         if self.csvDirectory.text():
             csv_dir = Path(self.csvDirectory.text()).resolve()
         else:
             self.log("warning", "No CSV directory specified.")
-            return False
+            return
         num_splits = self.settings.get_setting("training/splits")
         seed = self.settings.get_setting("training/split_seed")
         if not self.features:
@@ -448,71 +386,84 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "warning",
                 "No labeled features inputed. Please add annotated features above.",
             )
-            return False
+            return
+
+        finish_callback = partial(self._on_thread_finish, "Annotations")
+        self.progress_dict["Annotations"] = {"count": 0, "total": 0}
         # Check for no samples
         if not samples:
-            sample = src_dir.name
-            worker = Worker(
-                partial(
-                    run_both,
-                    src_dir,
-                    src_dir,
-                    annot_dir,
-                    csv_dir,
-                    self.features,
-                    csv_dir / f"{sample}.csv",
-                    sample,
-                    num_splits,
-                    seed,
-                ),
-                has_progress=True,
-            )
-            worker.signals.progress.connect(self._update_progress_bar)
-            worker.signals.finish.connect(on_finish)
-            worker.signals.error.connect(self._handle_thread_exception)
-            self.threadpool.start(worker)
-            return True
-
-        self.splits_completed = 1
-        for sample in samples:
-            if not os.path.isdir(src_dir / sample):
+            if not os.path.isdir(src_dir):
                 self.log(
                     "error",
-                    f"Invalid raw directory: {src_dir / sample}, skipping sample.",
+                    f"Invalid raw directory: {src_dir}.",
                 )
-                continue
-            worker = Worker(
+                return
+            self.progress_dict["Annotations"]["total"] = 2
+            sample = src_dir.name
+            annotation_worker = Worker(
                 partial(
-                    run_both,
-                    src_dir / sample,
-                    src_dir / sample,
-                    annot_dir / sample,
-                    csv_dir,
-                    self.features,
-                    csv_dir / f"{sample}.csv",
-                    sample,
-                    num_splits,
-                    seed,
-                ),
-                has_progress=True if len(samples) == 1 else False,
+                    add_annotations,
+                    src_dir=src_dir,
+                    dst_dir=src_dir,
+                    annot_dir=annot_dir,
+                    csv_file=csv_dir / f"{sample}.csv",
+                    features=self.features,
+                )
             )
-            if len(samples) == 1:
-                worker.signals.progress.connect(self._update_progress_bar)
-                worker.signals.finish.connect(on_finish)
-            else:
-                worker.signals.finish.connect(on_partial_finish)
-            worker.signals.error.connect(self._handle_thread_exception)
-            self.threadpool.start(worker)
-        return True
+            split_worker = Worker(
+                partial(
+                    add_splits,
+                    dst_dir=csv_dir,
+                    csv_file=csv_dir / f"{sample}.csv",
+                    sample=sample,
+                    num_splits=num_splits,
+                    seed=seed,
+                )
+            )
+            annotation_worker.signals.finish.connect(finish_callback)
+            split_worker.signals.finish.connect(finish_callback)
+            annotation_worker.signals.error.connect(self._handle_thread_exception)
+            split_worker.signals.error.connect(self._handle_thread_exception)
+            self.threadpool.start(annotation_worker)
+            self.threadpool.start(split_worker)
+        else:
+            self.progress_dict["Annotations"]["total"] = len(samples) * 2
+            for sample in samples:
+                if not os.path.isdir(src_dir / sample):
+                    self.log(
+                        "error",
+                        f"Invalid raw directory: {src_dir / sample}, skipping sample.",
+                    )
+                    continue
+                annotation_worker = Worker(
+                    partial(
+                        add_annotations,
+                        src_dir=src_dir / sample,
+                        dst_dir=src_dir / sample,
+                        annot_dir=annot_dir / sample,
+                        csv_file=csv_dir / f"{sample}.csv",
+                        features=self.features,
+                    )
+                )
+                split_worker = Worker(
+                    partial(
+                        add_splits,
+                        dst_dir=csv_dir,
+                        csv_file=csv_dir / f"{sample}.csv",
+                        sample=sample,
+                        num_splits=num_splits,
+                        seed=seed,
+                    )
+                )
+                annotation_worker.signals.finish.connect(finish_callback)
+                split_worker.signals.finish.connect(finish_callback)
+                annotation_worker.signals.error.connect(self._handle_thread_exception)
+                split_worker.signals.error.connect(self._handle_thread_exception)
+                self.threadpool.start(annotation_worker)
+                self.threadpool.start(split_worker)
 
     @_catch_exceptions("generate new training splits", concurrent=True)
-    def run_new_training_splits(self, *args) -> bool:
-        self.running = True
-
-        def on_finish():
-            self.running = False
-            self.log("success", "Generate new training splits complete.")
-
+    def run_new_training_splits(self, *args):
         # Get directory from settings
         if self.csvDirectory.text():
             csv_dir = Path(self.csvDirectory.text()).resolve()
@@ -521,7 +472,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "warning",
                 f"No CSV directory specified. Please specify a CSV directory.",
             )
-            return False
+            return
         num_splits = self.settings.get_setting("training/splits")
         seed = self.settings.get_setting("training/split_seed")
 
@@ -547,75 +498,66 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             if result == QMessageBox.StandardButton.No:
                 self.log("warning", "New split generation cancelled.")
-                return False
+                return
         elif not ok:
             self.log("warning", f"No split specified. Please specify a split name.")
-            return False
+            return
 
+        finish_callback = partial(self._on_thread_finish, "New Splits")
         worker = Worker(
             generate_new_splits,
             splits_file,
             dst_file=csv_dir / f"{dst_name}.csv",
             num_splits=num_splits,
             seed=seed,
-            has_progress=True,
         )
-        worker.signals.progress.connect(self._update_progress_bar)
-        worker.signals.finish.connect(on_finish)
+        worker.signals.finish.connect(finish_callback)
         worker.signals.error.connect(self._handle_thread_exception)
         self.threadpool.start(worker)
-        return True
 
     @_catch_exceptions("segmentation", concurrent=True)
-    def run_segmentation(self, *args) -> bool:
-        self.running = True
-
-        def on_finish():
-            self.running = False
-            self.log("success", "Segmentation complete.")
-
+    def run_segmentation(self, *args):
         # Check for required settings
         model_dir = self.settings.get_setting("model/model_dir")
-        if not model_dir:
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return False
-        dino_dir = self.settings.get_setting("general/dino_dir")
-        if not dino_dir:
-            self.log(
-                "error",
-                f"Invalid DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
-            )
-            return False
-        features_dir = self.settings.get_setting("general/features_dir")
-        if not features_dir:
+        if model_dir:
+            model_dir = Path(model_dir).resolve()
+        else:
             self.log(
                 "warning",
-                f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the DINO directory in the settings.",
+                f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
-            features_dir = None
-        kwargs = {}
-        if self.settings.get_setting("segmentation/batch_size"):
-            kwargs["batch_size"] = self.settings.get_setting("segmentation/batch_size")
-        if self.settings.get_setting("segmentation/csv_file"):
-            kwargs["csv_file"] = self.settings.get_setting("segmentation/csv_file")
-        # Get direcctories
-        raw_dir = self.rawDirectory.text()
-        replace_proc = self.replaceCheckboxProc.isChecked()
-        replace_proc_dir = self.replaceDirectoryProc
-        src_dir = Path(replace_proc_dir.text() if replace_proc else raw_dir)
+            return
+        dino_dir = self.settings.get_setting("general/dino_dir")
+        if dino_dir:
+            dino_dir = Path(dino_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
+            )
+            return
+        if self.dataDirectory.text():
+            src_dir = Path(self.dataDirectory.text()).resolve()
+        else:
+            self.log("warning", "No data directory specified.")
+            return
+
+        # Get directories
         replace_seg = self.replaceCheckboxSeg.isChecked()
         replace_seg_dir = self.replaceDirectorySeg
         dst_dir = Path(replace_seg_dir.text() if replace_seg else src_dir)
-
-        batch_size = self.settings.get_setting("segmentation/batch_size")
-        csv_file = (
-            self.settings.get_setting("segmentation/csv_file")
-            if self.settings.get_setting("segmentation/csv_file")
-            else None
-        )
+        features_dir = self.settings.get_setting("general/features_dir")
+        if features_dir:
+            features_dir = Path(features_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
+            )
+            features_dir = src_dir
+        kwargs = {"batch_size": self.settings.get_setting("segmentation/batch_size")}
+        if self.settings.get_setting("segmentation/csv_file"):
+            kwargs["csv_file"] = self.settings.get_setting("segmentation/csv_file")
 
         # Get model list
         model_names = [
@@ -623,119 +565,158 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             for page in self._models
             if self.modelTabs.indexOf(self._models[page]["widget"]) != -1
         ]
-
         models, configs = zip(*[load_model(model_dir, name) for name in model_names])
 
-        self.segments_completed = 0
+        self.progress_dict["Segmentation"] = {"count": 0, "total": len(models) + 1}
+        dino_worker = Worker(
+            get_dino_features, dino_dir, src_dir, dst_dir=features_dir, **kwargs
+        )
+        dino_worker.signals.finish.connect(
+            partial(
+                self._run_inference,
+                models,
+                configs,
+                src_dir if features_dir is None else features_dir,
+                dst_dir=dst_dir,
+                **kwargs,
+            )
+        )
+        dino_worker.signals.error.connect(self._handle_thread_exception)
+        self.threadpool.start(dino_worker)
 
-        def update_segments_completed():
-            self.segments_completed += 1
-            self._update_progress_bar(self.segments_completed - 1, len(models))
-            if self.samples_completed == len(models):
-                on_finish()
-
+    def _run_inference(
+        self,
+        models,
+        configs,
+        src_dir: Path,
+        batch_size: int = None,
+        dst_dir: Path = None,
+        csv_file: Path = None,
+    ):
+        """Run inference on the model."""
+        finish_callback = partial(self._on_thread_finish, "Segmentation")
+        finish_callback()
         for i in range(len(models)):
-
-            def run_both(callback_fn: callable = None):
-                get_dino_features(dino_dir, src_dir, dst_dir=features_dir, **kwargs)
-                run_inference(
-                    models[i],
-                    configs[i],
-                    src_dir if features_dir is None else features_dir,
-                    batch_size=batch_size,
-                    dst_dir=dst_dir,
-                    csv_file=csv_file,
-                    callback_fn=callback_fn,
-                )
-
-            worker = Worker(run_both, has_progress=True if len(models) == 1 else False)
-            if len(models) == 1:
-                worker.signals.progress.connect(self._update_progress_bar)
-                worker.signals.finish.connect(on_finish)
-            else:
-                worker.signals.finish.connect(update_segments_completed)
-            worker.signals.error.connect(self._handle_thread_exception)
-            self.threadpool.start(worker)
-        return True
+            inference_worker = Worker(
+                run_inference,
+                models[i],
+                configs[i],
+                src_dir,
+                batch_size=batch_size,
+                dst_dir=dst_dir,
+                csv_file=csv_file,
+            )
+            inference_worker.signals.finish.connect(finish_callback)
+            inference_worker.signals.error.connect(self._handle_thread_exception)
+            self.threadpool.start(inference_worker)
 
     @_catch_exceptions("training", concurrent=True)
-    def run_training(self, *args) -> bool:
-        self.running = True
-
-        def on_finish():
-            self.running = False
-            self.log("success", "Training complete.")
-
+    def run_training(self, *args):
         # Check for required settings
         model_dir = self.settings.get_setting("model/model_dir")
-        if not model_dir:
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return False
-        dino_dir = self.settings.get_setting("general/dino_dir")
-        if not dino_dir:
-            self.log(
-                "error",
-                f"Invalid DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
-            )
-            return False
-        features_dir = self.settings.get_setting("general/features_dir")
-        if not features_dir:
+        if model_dir:
+            model_dir = Path(model_dir).resolve()
+        else:
             self.log(
                 "warning",
-                f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the DINO directory in the settings.",
+                f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
-            features_dir = None
-        if not self.train_model or self.train_model_config:
+            return
+        dino_dir = self.settings.get_setting("general/dino_dir")
+        if dino_dir:
+            dino_dir = Path(dino_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
+            )
+            return
+        if self.dataDirectoryTrain.text():
+            data_dir = Path(self.dataDirectoryTrain.text()).resolve()
+        else:
+            self.log("warning", "No data directory specified.")
+            return
+        if self.csvDirectory.text():
+            csv_dir = Path(self.csvDirectory.text()).resolve()
+        else:
+            self.log("warning", "No CSV directory specified.")
+            return
+        if not self.train_model_config:
             self.log(
                 "warning",
                 "No model selected. Please select a model in the 'Training' section in the 'Train Model' tab.",
             )
-            return False
+            return
 
         # Get directories
-        raw_dir = self.rawDirectory.text()
-        replace_proc = self.replaceCheckboxProc.isChecked()
-        replace_proc_dir = self.replaceDirectoryProc
-        data_dir = Path(replace_proc_dir.text() if replace_proc else raw_dir)
-        csv_dir = Path(self.csvDirectory.text())
         split_file = self.settings.get_setting("training/splits_file")
-        if not split_file:
+        if split_file:
+            split_file = Path(split_file).resolve()
+        else:
             split_file = csv_dir / "splits.csv"
             self.settings.set_setting("training/splits_file", str(split_file))
+        features_dir = self.settings.get_setting("general/features_dir")
+        if features_dir:
+            features_dir = Path(features_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
+            )
+            features_dir = data_dir
         batch_size = self.settings.get_setting("training/batch_size")
         split_id = self.settings.get_setting("training/split_id")
         seed = self.settings.get_setting("training/split_seed")
 
-        # Run training
-        def run_all(callback_fn: callable = None):
-            get_dino_features(
-                dino_dir,
-                data_dir,
-                batch_size,
-                dst_dir=features_dir,
-                callback_fn=callback_fn,
-            )
-            train_model(
+        self.progress_dict["Training"] = {"count": 0, "total": 2}
+        self.train_model = load_base_model(self.train_model_config)
+        dino_worker = Worker(
+            get_dino_features, dino_dir, data_dir, batch_size, dst_dir=features_dir
+        )
+        dino_worker.signals.finish.connect(
+            partial(
+                self._train_model,
                 self.train_model,
                 self.train_model_config,
                 self.trainer_config,
-                data_dir if features_dir is None else features_dir,
+                features_dir,
                 split_file,
                 batch_size,
                 split_id,
                 seed,
             )
-            save_model(self.train_model_config, model_dir, model=self.train_model)
+        )
+        dino_worker.signals.error.connect(self._handle_thread_exception)
+        self.threadpool.start(dino_worker)
 
-        worker = Worker(run_all, has_progress=True)
-        worker.signals.progress.connect(self._update_progress_bar)
-        worker.signals.finish.connect(on_finish)
-        worker.signals.error.connect(self._handle_thread_exception)
-        self.threadpool.start(worker)
-        return True
+    def _train_model(
+        self,
+        model,
+        config: InterfaceModelConfig,
+        trainer_config: TrainerFit,
+        data_dir: Path,
+        split_file: Path,
+        batch_size: int,
+        split_id: int,
+        seed: int,
+    ):
+        """Train the model."""
+        finish_callback = partial(self._on_thread_finish, "Training")
+        finish_callback()
+        train_worker = Worker(
+            train_model,
+            model,
+            config,
+            trainer_config,
+            data_dir,
+            split_file,
+            batch_size,
+            split_id,
+            seed,
+        )
+        train_worker.signals.finish.connect(finish_callback)
+        train_worker.signals.error.connect(self._handle_thread_exception)
+        self.threadpool.start(train_worker)
 
     def setup_console(self):
         sys.stdout = EmittingStream(textWritten=partial(self.log, "info", end=""))
@@ -794,6 +775,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sampleSelectCombo.setObjectName(old_combo.objectName())
         self.sampleSelectCombo.setToolTip(old_combo.toolTip())
         self.sampleSelectCombo.setPlaceholderText(old_combo.placeholderText())
+        self.sampleSelectCombo.currentTextChanged.connect(
+            self._update_train_model_samples
+        )
         self.sampleSelectLayout.replaceWidget(old_combo, self.sampleSelectCombo)
         old_combo.deleteLater()
 
@@ -974,7 +958,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for model_path in model_paths:
             # Ask user for config
             model_name = os.path.basename(model_path)
-            config_dialog = ModelDialog(self)
+            model_config = InterfaceModelConfig(
+                model_name, "", ModelArch.CRYOVIT, {}, [], {}
+            )
+            config_dialog = ModelDialog(self, model_config)
             result = config_dialog.exec()
             if result == config_dialog.DialogCode.Rejected:
                 self.log("info", f"Skipping import for model {model_name}.")
@@ -1205,15 +1192,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not self.train_model_config:
             samples = self.sampleSelectCombo.getCurrentData()
             self.train_model_config = InterfaceModelConfig(
-                name=text.lower(),
-                label_key="",
-                model_type=ModelArch[text],
-                model_params={},
-                samples=samples,
-                metrics={},
+                text.lower(),
+                "",
+                ModelArch[text],
+                {},
+                samples,
+                {},
             )
         self.train_model_config.model_type = ModelArch[text]
-        self.train_model = load_base_model(self.train_model_config)
+
+    @_catch_exceptions("update training model samples")
+    def _update_train_model_samples(self, text: str, *args):
+        samples = list(map(str.strip, text.split(",")))
+        if not self.train_model_config:
+            self.train_model_config = InterfaceModelConfig(
+                self.modelComboTrain.currentText().lower(),
+                "",
+                ModelArch[self.modelComboTrain.currentText()],
+                {},
+                samples,
+                {},
+            )
+        self.train_model_config.samples = samples
 
     @_catch_exceptions("update training model label")
     def _update_train_model_label(self, text: str, *args):
@@ -1233,7 +1233,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "No model selected. Please select a model in the 'Training' section.",
             )
             return
-        config_dialog = ModelDialog(self, trainer_config=self.trainer_config)
+        config_dialog = ModelDialog(
+            self, self.train_model_config, trainer_config=self.trainer_config
+        )
         config_dialog.exec()
         if config_dialog.result() == config_dialog.DialogCode.Accepted:
             self.train_model_config = config_dialog.config
@@ -1382,7 +1384,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def _update_progress_bar(self, index: int, total: int):
         """Update the progress bar with the current index (assume 0-indexed) and total."""
-        self.progressBar.setValue((index + 1 // total) * self.progressBar.maximum())
+        self.progressBar.setValue((index // total) * self.progressBar.maximum())
 
     def log(self, mode: str, text: str, end="\n"):
         """Write text to the console with a timestamp and different colors for normal output and errors."""
@@ -1393,7 +1395,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.consoleText.insertPlainText(text)
             return
         # Get timestamp
-        timestamp_str = "{}> ".format(time.strftime("%X"))
+        timestamp_str = "{}> ".format(time.strftime("[%H:%M:%S]"))
         # Format text with colors and timestamp
         full_text = timestamp_str + text + end
         match mode:
@@ -1408,7 +1410,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Add line breaks in HTML
         full_text = full_text.replace("\n", "<br>")
         # Write to console ouptut
+        keep_scrolling = (
+            self.consoleText.verticalScrollBar().value()
+            == self.consoleText.verticalScrollBar().maximum()
+        )
         self.consoleText.insertHtml(full_text)
+        if keep_scrolling:
+            self.consoleText.verticalScrollBar().setValue(
+                self.consoleText.verticalScrollBar().maximum()
+            )
 
     def closeEvent(self, event):
         """Override close event to save settings."""
@@ -1416,10 +1426,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         event.accept()
 
 
-app = QApplication(sys.argv)
-app.setStyle("Fusion")
+dino_dir = Path("C:/Users/visav/Documents/Work/CryoViT/Data/DINOv2").resolve()
+data_dir = Path(
+    "C:/Users/visav/Documents/Work/CryoViT/Data/Processed Tomograms/Q66"
+).resolve()
+batch_size = 8
+dst_dir = Path("C:/Users/visav/Documents/Work/CryoViT/Data/Dino Features/Q66").resolve()
+get_dino_features(
+    dino_dir,
+    data_dir,
+    batch_size,
+    dst_dir=dst_dir,
+)
 
-window = MainWindow()
-window.show()
+# app = QApplication(sys.argv)
+# app.setStyle("Fusion")
 
-app.exec()
+# window = MainWindow()
+# window.show()
+
+# app.exec()

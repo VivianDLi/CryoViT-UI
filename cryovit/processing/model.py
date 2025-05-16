@@ -2,18 +2,20 @@
 
 import os
 import sys
+import platform
 from pathlib import Path
 import shutil
 import json
 from typing import Any, List, Optional, Tuple
 import logging
 
+from tqdm import tqdm
 import h5py
 from pytorch_lightning import LightningModule
-from rich.progress import track
 from hydra.utils import instantiate
 import pandas as pd
 import torch
+from torch.utils.data import DataLoader as torchDataLoader
 from pytorch_lightning import seed_everything
 from pytorch_lightning.callbacks import BasePredictionWriter
 
@@ -176,7 +178,6 @@ def get_dino_features(
     batch_size: int,
     dst_dir: Path = None,
     csv_file: Path = None,
-    callback_fn: callable = None,
 ):
     """Compute DINOv2 features for a set of tomograms.
 
@@ -186,7 +187,6 @@ def get_dino_features(
         batch_size (int): Batch size for processing the tomograms.
         dst_dir (Path, optional): Path to the directory to save tomograms with DINOv2 features. Defaults to None. If None, features will be added to the original tomograms.
         csv_file (Path, optional): Path to the .csv file for specifying which tomograms to compute. Defaults to None. If None, all tomograms in the directory will be used.
-        callback_fn (callable, optional): Callback function to be called after each tomogram is processed. Takes as arguments the current index and total index. Defaults to None.
     """
     torch.set_float32_matmul_precision("high")  # ensures tensor cores are used
 
@@ -206,29 +206,35 @@ def get_dino_features(
     else:
         # use all files in the directory
         records = pd.Series(
-            [f.name for f in data_dir.glob("*") if f.suffix in {".rec", ".mrc", ".hdf"}]
+            [
+                f.name
+                for f in data_dir.glob("*")
+                if f.suffix in {".rec", ".mrc", ".hdf"}
+            ]
         )
     dataset = VITDataset(records, root=data_dir)
-    dataloader = DataLoader(dataset, **dataloader_params)
+    dataloader = torchDataLoader(dataset, **dataloader_params)
     # Load the DINOv2 model
     torch.hub.set_dir(dino_dir)
-    model = torch.hub.load(*dino_model, verbose=False).cuda()
+    model = torch.hub.load(*dino_model, verbose=False)
+    if torch.cuda.is_available():
+        model = model.cuda()
     model.eval()
     # Get Dinov2 features
-    for i, x in track(
+    print(len(dataloader))
+    for i, x in tqdm(
         enumerate(dataloader),
-        description=f"[green]Computing features for {data_dir.name}",
+        desc=f"Computing features for {data_dir.name}",
         total=len(dataloader),
     ):
         features = dino_features(x, model, batch_size)
         if not replace:
             # copy tomograms to a new directory
             shutil.copy(data_dir / records[i], dst_dir / records[i])
-        with h5py.File(dst_dir / records[i], "r+") as fh:
+        with h5py.File(dst_dir / records[i], "a") as fh:
             if "dino_features" in fh:
                 del fh["dino_features"]
             fh.create_dataset("dino_features", data=features)
-        callback_fn(i, len(dataloader)) if callback_fn else None
 
 
 def train_model(
@@ -279,7 +285,8 @@ def train_model(
     )
     # Setup the trainer and model
     trainer = instantiate(trainer_config)
-    model.forward = torch.compile(model.forward)
+    if platform.system() != "Windows":
+        model.forward = torch.compile(model.forward)
     # Train model
     trainer.fit(
         model,

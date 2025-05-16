@@ -1,6 +1,14 @@
 """Subwindow for configuring model parameters and training settings."""
 
-from PyQt6.QtWidgets import QDialog, QMessageBox, QLineEdit, QInputDialog
+from typing import Dict, Union
+from PyQt6.QtWidgets import (
+    QDialog,
+    QMessageBox,
+    QLineEdit,
+    QSpinBox,
+    QDoubleSpinBox,
+    QInputDialog,
+)
 
 from cryovit.config import InterfaceModelConfig, models, ModelArch, TrainerFit
 from cryovit.gui.layouts.modeldialog import Ui_ModelDialog
@@ -9,92 +17,194 @@ from cryovit.gui.layouts.modeldialog import Ui_ModelDialog
 class ModelDialog(QDialog, Ui_ModelDialog):
     """Subwindow for configuring model parameters and training settings."""
 
-    def __init__(self, parent=None, trainer_config: TrainerFit = None):
+    def __init__(
+        self,
+        parent,
+        model_config: InterfaceModelConfig,
+        trainer_config: TrainerFit = None,
+    ):
         super().__init__(parent)
         self.setupUi(self)
-        self.setWindowTitle("Model Details:")
-        self.config = InterfaceModelConfig()
+        self.setWindowTitle("Model Config:")
+        self.config = model_config
+        self.trainer_config = trainer_config
         self.param_dict = []
         self.metrics_dict = []
         # Setup UI
         self.archCombo.addItems(models)
         self.paramAdd.clicked.connect(self.add_param)
         self.paramRemove.clicked.connect(self.remove_param)
-        self.metricsAdd.clicked.connect(self.add_metrics)
-        self.metricsRemove.clicked.connect(self.remove_metrics)
-        self.trainer_config = trainer_config
+        self.metricsAdd.clicked.connect(self.add_metric)
+        self.metricsRemove.clicked.connect(self.remove_metric)
         if self.trainer_config:
             self.trainerConfigGroup.setVisible(True)
         else:
             self.trainerConfigGroup.setVisible(False)
+        # Update UI elements with current model configuration
+        self.update_UI(self.config, self.trainer_config)
 
     def add_param(self):
-        param_name = QLineEdit()
-        param_value = QLineEdit()
-        self.param_dict.append({"name": "", "value": ""})
+        name, ok = QInputDialog.getText(
+            self,
+            "Add Parameter",
+            "Enter the name of the parameter:",
+            QLineEdit.EchoMode.Normal,
+        )
+        if not ok or not name:
+            return
+        value_type, ok = QInputDialog.getItem(
+            self,
+            "Add Parameter",
+            "Enter the type of the parameter:",
+            ["String", "Integer", "Float"],
+            editable=False,
+        )
+        if not ok or not value_type:
+            return
+        match value_type:
+            case "String":
+                value = ""
+            case "Integer":
+                value = 0
+            case "Float":
+                value = 0.0
+            case _:
+                value = ""
+        self._add_param(name, value)
+
+    def add_params(self, params: Dict[str, Union[str, int, float]]):
+        for name, value in params.items():
+            self._add_param(name, value)
+
+    def _add_param(self, name: str, value: Union[str, int, float]):
+        self.param_dict.append({"name": name, "value": value})
         index = len(self.param_dict) - 1
+        param_name = QLineEdit(name)
         param_name.editingFinished.connect(
             lambda: self.param_dict[index].update({"name": param_name.text()})
         )
-        param_value.editingFinished.connect(
-            lambda: self.param_dict[index].update({"value": param_value.text()})
-        )
-        self.metricsFrame.insertRow(
-            self.metricsFrame.rowCount() - 1, param_name, param_value
+        match type(value).__qualname__:
+            case str.__qualname__:
+                param_value = QLineEdit(str(value))
+                param_value.editingFinished.connect(
+                    lambda: self.param_dict[index].update({"value": param_value.text()})
+                )
+            case int.__qualname__:
+                param_value = QSpinBox()
+                param_value.setValue(int(value))
+                param_value.valueChanged.connect(
+                    lambda: self.param_dict[index].update(
+                        {"value": param_value.value()}
+                    )
+                )
+            case float.__qualname__:
+                param_value = QDoubleSpinBox()
+                param_value.setValue(float(value))
+                param_value.valueChanged.connect(
+                    lambda: self.param_dict[index].update(
+                        {"value": param_value.value()}
+                    )
+                )
+            case _:
+                self.parent.log(
+                    "warning",
+                    f"Unsupported type for parameter value: {type(value)}. Ignoring this parameter.",
+                )
+                self.param_dict.pop(index)
+                return
+        # Prevent garbage collection
+        setattr(self, f"paramLabel_{index}", param_name)
+        setattr(self, f"paramValue_{index}", param_value)
+        self.paramLayout.insertRow(
+            self.paramLayout.rowCount() - 1, param_name, param_value
         )
 
     def remove_param(self):
-        name, _ = QInputDialog.getText(
+        name, ok = QInputDialog.getText(
             self,
             "Remove Parameter",
             "Enter the name of the parameter to remove:",
             QLineEdit.EchoMode.Normal,
         )
-        if name in [p["name"] for p in self.param_dict]:
-            index = [i for i, p in enumerate(self.param_dict) if p["name"] == name][0]
+        if not ok or not name:
+            return
+        param_names = [p["name"] for p in self.param_dict]
+        if name in param_names:
+            index = param_names.index(name)
             self.param_dict.pop(index)
-            self.metricsFrame.removeRow(index)
+            self.paramLayout.removeRow(index)
+            delattr(self, f"paramLabel_{index}")
+            delattr(self, f"paramValue_{index}")
 
-    def add_metrics(self):
-        metric_name = QLineEdit()
-        metric_value = QLineEdit()
-        self.metrics_dict.append({"name": "", "value": ""})
+    def add_metric(self):
+        name, ok = QInputDialog.getText(
+            self,
+            "Add Parameter",
+            "Enter the name of the parameter:",
+            QLineEdit.EchoMode.Normal,
+        )
+        if not ok or not name:
+            return
+        self._add_metric(name, 0.0)
+
+    def add_metrics(self, metrics: Dict[str, float]):
+        for name, value in metrics.items():
+            self._add_metric(name, value)
+
+    def _add_metric(self, name: str, value: float):
+        metric_name = QLineEdit(name)
+        metric_value = QDoubleSpinBox()
+        metric_value.setValue(value)
+        self.metrics_dict.append({"name": name, "value": value})
         index = len(self.metrics_dict) - 1
         metric_name.editingFinished.connect(
             lambda: self.metrics_dict[index].update({"name": metric_name.text()})
         )
-        metric_value.editingFinished.connect(
-            lambda: self.metrics_dict[index].update({"value": metric_value.text()})
+        metric_value.valueChanged.connect(
+            lambda: self.metrics_dict[index].update({"value": metric_value.value()})
         )
-        self.metricsFrame.insertRow(
-            self.metricsFrame.rowCount() - 1, metric_name, metric_value
+        # Prevent garbage collection
+        setattr(self, f"metricLabel_{index}", metric_name)
+        setattr(self, f"metricValue_{index}", metric_value)
+        self.metricsLayout.insertRow(
+            self.metricsLayout.rowCount() - 1, metric_name, metric_value
         )
 
-    def remove_metrics(self):
-        name, _ = QInputDialog.getText(
+    def remove_metric(self):
+        name, ok = QInputDialog.getText(
             self,
             "Remove Metric",
             "Enter the name of the metric to remove:",
             QLineEdit.EchoMode.Normal,
         )
-        if name in [m["name"] for m in self.metrics_dict]:
-            index = [i for i, m in enumerate(self.metrics_dict) if m["name"] == name][0]
+        if not ok or not name:
+            return
+        metric_names = [m["name"] for m in self.metrics_dict]
+        if name in metric_names:
+            index = metric_names.index(name)
             self.metrics_dict.pop(index)
-            self.metricsFrame.removeRow(index)
+            self.metricsLayout.removeRow(index)
+            delattr(self, f"metricLabel_{index}")
+            delattr(self, f"metricValue_{index}")
 
     def validate_config(self):
         try:
             self.config.name = self.nameDisplay.text()
             self.label_key = self.labelDisplay.text()
             self.config.model_type = ModelArch[self.archCombo.currentText()]
-            self.config.params = {
+            self.config.model_params = {
                 p["name"]: p["value"] for p in self.param_dict if p["name"]
             }
-            self.config.samples = list(map(str.strip, self.samplesDisplay.text().split(","))) if self.samplesDisplay.text() else []
+            self.config.samples = (
+                list(map(str.strip, self.samplesDisplay.text().split(",")))
+                if self.samplesDisplay.text()
+                else []
+            )
             if not self.config.samples:
-                raise ValueError("Samples cannot be empty.")
+                self.parent.log("error", "Samples cannot be empty.")
+                return False
             self.config.metrics = {
-                m["name"]: m["value"] for m in self.metrics_dict if m["name"]
+                m["name"]: float(m["value"]) for m in self.metrics_dict if m["name"]
             }
 
             if self.trainer_config:
@@ -107,6 +217,29 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         except Exception as e:
             self.parent.log("error", f"Error validating configuration: {e}")
             return False
+
+    def update_UI(
+        self,
+        model_config: InterfaceModelConfig,
+        trainer_config: Union[TrainerFit, None],
+    ):
+        """Update the UI with the new model configuration."""
+        self.config = model_config
+        self.trainer_config = trainer_config
+        self.nameDisplay.setText(self.config.name)
+        self.labelDisplay.setText(self.config.label_key)
+        self.archCombo.setCurrentText(self.config.model_type.name)
+        self.add_params(self.config.model_params)
+        self.samplesDisplay.setText(
+            ", ".join(self.config.samples) if self.config.samples else ""
+        )
+        self.add_metrics(self.config.metrics)
+        if self.trainer_config:
+            self.accelCombo.setCurrentText(self.trainer_config.accelerator)
+            self.devicesDisplay.setText(self.trainer_config.devices)
+            self.precisionCombo.setCurrentText(self.trainer_config.precision)
+            self.epochSpin.setValue(self.trainer_config.max_epochs)
+            self.loggingSpin.setValue(self.trainer_config.log_every_n_steps)
 
     def accept(self):
         """Override accept to validate and save the model configuration."""
