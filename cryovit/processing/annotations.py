@@ -47,10 +47,7 @@ def add_annotations(
         tomo_name = row[1]
         z_min, z_max = row[2:4]
         slices = row[4:]
-
-        # Create a new directory for the tomogram
-        dst_tomo_dir = dst_dir / tomo_name
-        dst_tomo_dir.mkdir(parents=True, exist_ok=True)
+        dst_tomo = dst_dir / tomo_name
 
         # Load the tomogram data
         with h5py.File(src_dir / tomo_name, "r") as fh:
@@ -69,9 +66,12 @@ def add_annotations(
                     label = np.where(annotation == 254 - i, 1, 0)
                     label = ndimage.binary_fill_holes(label)
                     labels[idx] = label.astype(np.int8)
+            else:
+                logger.warning(f"Annotation file {annot_path} not found. Skipping.")
+                continue
 
         # Save the tomogram with annotations
-        with h5py.File(dst_tomo_dir / tomo_name, "w") as fh:
+        with h5py.File(dst_tomo, "a") as fh:
             if "data" in fh:
                 del fh["data"]
             fh.create_dataset("data", data=data, compression="gzip")
@@ -111,10 +111,15 @@ def add_splits(
             annotation_df.at[idx, "split_id"] = fold_id
         callback_fn(fold_id, n_splits) if callback_fn else None
     annotation_df["sample"] = (
-        annotation_df["tomo_name"].str.split("_").str[1] if sample is None else sample
+        annotation_df["tomo_name"][0].split("_")[1] if sample is None else sample
     )
 
-    annotation_df.to_csv(dst_dir / "splits.csv", mode="a", index=False, header=False)
+    splits_df = pd.read_csv(dst_dir / "splits.csv")
+    # remove matching rows from the splits_df
+    splits_df = splits_df[~splits_df["tomo_name"].isin(annotation_df["tomo_name"])]
+    # append new rows to the splits_df
+    splits_df = pd.concat([splits_df, annotation_df], ignore_index=True)
+    splits_df.to_csv(dst_dir / "splits.csv", mode="w", index=False)
 
 
 def generate_new_splits(
@@ -146,4 +151,4 @@ def generate_new_splits(
 
     if dst_file is None:
         dst_file = splits_file
-    splits_df.to_csv(dst_file, mode="w", index=False, header=False)
+    splits_df.to_csv(dst_file, mode="w", index=False)
