@@ -2,8 +2,9 @@
 
 import sys
 from pathlib import Path
+from dataclasses import fields
 import json
-from typing import Any, List
+from typing import Any, List, Tuple
 import logging
 
 from cryovit.config import (
@@ -24,20 +25,28 @@ logger.addHandler(handler)
 
 
 # Custom classes and functions for handling ModelArch enums
-class EnumEncoder(json.JSONEncoder):
-    """Custom JSON encoder for Enum types."""
+class InterfaceEncoder(json.JSONEncoder):
+    """Custom JSON encoder for InterfaceModelConfig."""
 
-    def default(self, obj: Any) -> Any:
-        if type(obj) in ModelArch.values():
-            return {"__enum__": obj.name}
-        return super().default(obj)
+    def default(self, obj: InterfaceModelConfig) -> Any:
+        """Convert InterfaceModelConfig to JSON serializable format."""
+        return obj.to_json()
 
 
-def as_enum(dct: dict) -> ModelArch:
-    if "__enum__" in dct:
-        name = dct["__enum__"]
-        return ModelArch[name]
-    return dct
+def as_config(dct: dict) -> InterfaceModelConfig:
+    """Convert dictionary to InterfaceModelConfig."""
+    kwargs = {}
+    for key, value in dct.items():
+        match key:
+            case "model_type":
+                kwargs[key] = ModelArch[value["__enum__"]]
+            case "model_params":
+                kwargs[key] = {k: v for k, v in value.items()}
+            case "model_weights":
+                kwargs[key] = Path(value).resolve()
+            case _:
+                kwargs[key] = value
+    return InterfaceModelConfig(**kwargs)
 
 
 def get_available_models(model_dir: Path) -> List[str]:
@@ -66,19 +75,27 @@ def get_model_configs(
     """
     configs = []
     for model_name in model_names:
+        # Check if the model directory exists
+        model_path = model_dir / model_name
+        if not model_path.exists():
+            logger.error(f"Model directory {model_path} does not exist.")
+            continue
         with open(model_dir / model_name / "config.json", "r") as f:
-            model_config = InterfaceModelConfig(**json.loads(f, object_hook=as_enum))
+            model_config = InterfaceModelConfig(**json.load(f, object_hook=as_config))
         configs.append(model_config)
     return configs
 
 
 def save_model_config(model_dir: Path, model_config: InterfaceModelConfig) -> None:
     model_name = model_config.name
+    # Check if the model directory exists, if not create it
+    config_dir = model_dir / model_name
+    config_dir.mkdir(parents=True, exist_ok=True)
     with open(model_dir / model_name / "config.json", "w+") as f:
-        json.dumps(model_config, f, cls=EnumEncoder)
+        json.dump(model_config, f, cls=InterfaceEncoder)
 
 
-def load_base_model_config(model_config: InterfaceModelConfig) -> Model:
+def load_base_model_config(model_config: InterfaceModelConfig) -> Tuple[str, Model]:
     """Load a base model based on the provided configuration.
 
     Args:
@@ -90,8 +107,10 @@ def load_base_model_config(model_config: InterfaceModelConfig) -> Model:
     match model_config.model_type:
         case ModelArch.CRYOVIT:
             model_config = CryoVIT(**model_config.model_params)
+            model_name = "cryovit"
         case ModelArch.UNET3D:
             model_config = UNet3D(**model_config.model_params)
+            model_name = "unet3d"
         case _:
             logger.error(f"Unknown model type: {model_config.model_type}")
-    return model_config
+    return model_name, model_config

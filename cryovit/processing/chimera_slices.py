@@ -12,8 +12,8 @@ slice_markers = None
 
 
 def open_next_tomogram(session):
-    from chimerax.markers import MarkerSet
-    from chimerax.core.colors import Color
+    from chimerax.markers import MarkerSet  # type: ignore
+    from chimerax.core.colors import Color  # type: ignore
 
     global zlimit_markers, slice_markers
 
@@ -31,7 +31,7 @@ def save_slices(session, filename, slices):
     import os
     from PIL import Image
     import numpy as np
-    from chimerax.map import Volume
+    from chimerax.map import Volume  # type: ignore
 
     global dst_path
 
@@ -103,7 +103,7 @@ def set_tomogram_slices(
 
 
 def next_tomogram(session):
-    from chimerax.std_commands.close import close
+    from chimerax.std_commands.close import close  # type: ignore
 
     global csv_path, slice_n, files, file_n, csv_data
 
@@ -127,6 +127,8 @@ def next_tomogram(session):
         return
     # Save data to .csv file
     zlimits = sorted([round(a.coord[2]) for a in zlimit_markers.atoms])
+    # Adjust for end exclusion
+    zlimits[1] += 1
     slices = sorted([round(a.coord[2]) for a in slice_markers.atoms])
     csv_data.append([str(files[file_n].name), zlimits[0], zlimits[1]] + slices)
 
@@ -154,7 +156,7 @@ def next_tomogram(session):
 
 
 def register_commands(logger):
-    from chimerax.core.commands import (
+    from chimerax.core.commands import (  # type: ignore
         CmdDesc,
         register,
         OpenFolderNameArg,
@@ -183,7 +185,7 @@ def register_commands(logger):
     register("next", next_desc, next_tomogram, logger=logger)
 
 
-session.logger.info(
+session.logger.info(  # type: ignore
     """
 Start labelling tomograms by running 'start slice labels'.
     This expects as arguments a tomogram directory and, optionally, a sample name. By default, the slices will be saved in a folder called 'slices/sample' in the parent directory of the tomogram directory, and a .csv file will be saved in a folder called 'csv/sample' in that same parent directory.
@@ -195,4 +197,4 @@ Start labelling tomograms by running 'start slice labels'.
 After running 'start slice labels', use plane markers to select slices and z-limits, and run 'next' to save the slices and open the next tomogram.
 """
 )
-register_commands(session.logger)
+register_commands(session.logger)  # type: ignore

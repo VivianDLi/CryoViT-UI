@@ -192,7 +192,7 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
             settings_path = variable_name.replace("__", "/")
             label = QLabel(
                 parent=parent_widget,
-                text=" ".join(map(str.capilatize, field.name.split("_"))),
+                text=" ".join(map(str.capitalize, field.name.split("_"))) + ":",
             )
             match field.type.__qualname__:
                 case str.__qualname__:

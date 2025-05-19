@@ -2,6 +2,7 @@
 
 import logging
 import os
+import platform
 from pathlib import Path
 
 from omegaconf import OmegaConf
@@ -123,7 +124,8 @@ def run_trainer(cfg: TrainModelConfig) -> None:
     datamodule = build_datamodule(cfg)
     trainer = instantiate(cfg.trainer)
     model = instantiate(cfg.model)
-    model.forward = torch.compile(model.forward)
+    if platform.system() != "Windows":  # torch.compile is not supported on Windows
+        model.forward = torch.compile(model.forward)
 
     trainer.fit(
         model,
@@ -150,5 +152,7 @@ def run_trainer(cfg: TrainModelConfig) -> None:
         config_dir = [
             path["path"] for path in search_paths if path["provider"] == "main"
         ][0]
-        OmegaConf.save(conf, Path(config_dir) / "models" / f"{cfg.exp_name}.yaml")
+        config_path = Path(config_dir) / "models" / f"{cfg.exp_name}.yaml"
+        config_path.parent.mkdir(parents=True, exist_ok=True)
+        OmegaConf.save(conf, config_path)
     wandb.finish(quiet=True)

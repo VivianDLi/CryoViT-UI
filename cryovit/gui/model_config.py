@@ -178,7 +178,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         )
         if self.trainer_config:
             self.accelCombo.setCurrentText(self.trainer_config.accelerator)
-            self.devicesDisplay.setText(self.trainer_config.devices)
+            self.devicesDisplay.setText(str(self.trainer_config.devices))
             self.precisionCombo.setCurrentText(self.trainer_config.precision)
             self.epochSpin.setValue(self.trainer_config.max_epochs)
             self.loggingSpin.setValue(self.trainer_config.log_every_n_steps)

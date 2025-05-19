@@ -4,12 +4,12 @@ import os
 from pathlib import Path
 import sys
 from functools import partial
-from dataclasses import dataclass, fields
+from dataclasses import is_dataclass, fields
 import platform
 import traceback
-import subprocess
 from typing import List
 from collections.abc import Iterable
+import pyperclip
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -37,7 +37,6 @@ from cryovit.config import (
     DinoFeaturesConfig,
     ExpPaths,
     MultiSample,
-    PretrainedModel,
     SingleSample,
     Inference,
     TrainModelConfig,
@@ -104,6 +103,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         )
                     func(self, *args, **kwargs)
                     if concurrent and self.threadpool.activeThreadCount() > 0:
+                        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+                    if (
+                        self.chimera_process is not None
+                        or self.dino_process is not None
+                    ):
                         QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
                 except Exception as e:
                     self.log("error", f"Error running {desc}: {e}")
@@ -278,7 +282,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
         else:
             self._next_chimera_process(
-                0, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+                0,
+                chimerax_path,
+                src_dir,
+                samples,
+                dst_dir,
+                csv_dir,
+                num_slices,
             )
 
     def _next_chimera_process(
@@ -297,12 +307,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self._update_progress_bar(index + 1, len(samples))
             if index >= len(samples):
                 self.log("success", "ChimeraX processing complete.")
+                QGuiApplication.restoreOverrideCursor()
                 return
             sample = samples[index]
             is_dir = os.path.isdir(src_dir / sample)
         else:
             if index >= 1:
                 self.log("success", "ChimeraX processing complete.")
+                QGuiApplication.restoreOverrideCursor()
                 return
             sample = None
             is_dir = os.path.isdir(src_dir)
@@ -312,7 +324,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Invalid raw directory: {src_dir / sample if sample else src_dir}, skipping sample.",
             )
             self._next_chimera_process(
-                index + 1, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+                index + 1,
+                chimerax_path,
+                src_dir,
+                samples,
+                dst_dir,
+                csv_dir,
+                num_slices,
             )
             return
         command = self._validate_chimerax_process(
@@ -350,13 +368,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"ChimeraX process for src_dir: {src_dir / sample if sample else src_dir} failed.",
             )
             self._next_chimera_process(
-                index + 1, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+                index + 1,
+                chimerax_path,
+                src_dir,
+                samples,
+                dst_dir,
+                csv_dir,
+                num_slices,
             )
             return
 
     def _validate_chimerax_process(
         self,
-        chimerax_path: str,
+        chimerax_path: Path,
         src_dir: Path,
         sample: str = None,
         dst_dir: Path = None,
@@ -382,39 +406,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         commands.extend(["num_slices", str(num_slices)])
         # Command to run chimera_slices and start slice labels
         command = " ".join(commands)
+        # Copy command to clipboard
+        pyperclip.copy(command)
         # Check for OS type
         match platform.system().lower():
             case "windows":  # Needs to be run from a specific path
                 # Check for valid path
-                if not os.path.isfile(
-                    chimerax_path
-                ) or not chimerax_path.lower().endswith("chimerax.exe"):
+                if (
+                    not os.path.isfile(chimerax_path)
+                    or not chimerax_path.name.lower() == "chimerax.exe"
+                ):
                     self.log(
                         "error",
                         f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.exe executable typically found in 'C:/Program Files/ChimeraX/bin/ChimeraX.exe'. Please set it in the settings.",
                     )
                     return None
-                # Copy command to clipboard
-                subprocess.check_call("echo " + command + " | clip", shell=True)
             case "linux":  # Has chimerax from command line
-                # Copy command to clipboard
-                subprocess.check_call("echo " + command + " | xsel -ib", shell=True)
                 chimerax_path = "chimerax"
             case "darwin":  # Needs to be run from a specific path
-                if not os.path.isfile(
-                    chimerax_path
-                ) or not chimerax_path.lower().endswith("chimerax.app"):
+                if (
+                    not os.path.isfile(chimerax_path)
+                    or not chimerax_path.name.lower() == "chimerax.app"
+                ):
                     self.log(
                         "error",
                         f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.app application typically found in '/Applications/ChimeraX.app'. Please set it in the settings.",
                     )
                     return None
-                # Copy command to clipboard
-                subprocess.check_call("echo " + command + " | pbcopy", shell=True)
             case _:
                 self.log("error", f"Unsupported OS type {platform.system()}.")
                 return None
-        return chimerax_path
+        return str(chimerax_path)
 
     @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
@@ -539,7 +561,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             splits_file = csv_dir / "splits.csv"
             self.settings.set_setting("training/splits_file", str(splits_file))
             self.log(
-                "warning", f"No splits file specified in Settings. Using {splits_file}."
+                "warning",
+                f"No splits file specified in Settings. Using {splits_file}.",
             )
 
         dst_name, ok = QInputDialog.getText(
@@ -634,16 +657,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             batch_size=dino_batch_size,
             sample=[src_dir.name],
         )
-        dino_command = "python -m cryovit.dino_features"
-        dino_command += self._create_command_from_config(
+        dino_commands = ["-m", "cryovit.dino_features"]
+        dino_commands += self._create_command_from_config(
             dino_config, ["all_samples", "cryovit_root"]
         )
+        dino_commands += ["hydra.mode=RUN"]
 
         # Setup segmentation command
         # Get model list
         model_names = ",".join(
             [
-                str(page)
+                '"' + str(page) + '"'
                 for page in self._models
                 if self.modelTabs.indexOf(self._models[page]["widget"]) != -1
             ]
@@ -658,8 +682,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             dataset=dataset_config,
             exp_paths=exp_paths,
         )
-        infer_command = "python -m cryovit.infer_model"
-        infer_command += self._create_command_from_config(
+        infer_commands = ["-m", "cryovit.infer_model"]
+        infer_commands += self._create_command_from_config(
             infer_config,
             [
                 "dataloader",
@@ -674,30 +698,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ],
         )
         # Add in additional settings
-        infer_command += f" dataloader.batch_size={batch_size} 'models=[{model_names}]'"
+        infer_commands += [
+            f"dataloader.batch_size={batch_size}",
+            f"models=[{model_names}]",
+            "hydra.mode=RUN",
+        ]
 
         # Setup QProcesses
         self.segment_process = QProcess()
         self.segment_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, self.segment_process)
+            partial(self._handle_stdout, "segment_process")
         )
         self.segment_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, self.segment_process)
+            partial(self._handle_stderr, "segment_process")
         )
-        self.segmnet_process.finished.connect(self._segment_process_finish)
+        self.segment_process.stateChanged.connect(
+            partial(self._handle_state_change, "segment_process")
+        )
+        self.segment_process.finished.connect(self._segment_process_finish)
 
         self.dino_process = QProcess()
         self.dino_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, self.dino_process)
+            partial(self._handle_stdout, "dino_process")
         )
         self.dino_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, self.dino_process)
+            partial(self._handle_stderr, "dino_process")
+        )
+        self.dino_process.stateChanged.connect(
+            partial(self._handle_state_change, "dino_process")
         )
         self.dino_process.finished.connect(
-            partial(self._dino_process_finish, self.segment_process, infer_command)
+            partial(self._dino_process_finish, "segment_process", infer_commands)
         )
         self.log("info", f"Running DINO features:")
-        self.dino_process.start(dino_command)
+        self.log("debug", f"Command: {dino_commands}")
+        self.dino_process.start("python", dino_commands)
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
@@ -772,17 +807,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             batch_size=dino_batch_size,
             sample=self.sampleSelectCombo.getCurrentData(),
         )
-        dino_command = "python -m cryovit.dino_features"
-        dino_command += self._create_command_from_config(
+        dino_commands = ["-m", "cryovit.dino_features"]
+        dino_commands += self._create_command_from_config(
             dino_config, ["all_samples", "cryovit_root"]
         )
+        dino_commands += ["hydra.mode=RUN"]
 
         # Setup training command
-        model_config = load_base_model_config(self.train_model_config)
+        model_name, model_config = load_base_model_config(self.train_model_config)
         if len(self.train_model_config.samples) > 1:
             dataset_config = MultiSample(sample=self.train_model_config.samples)
+            dataset_name = "multi"
         else:
             dataset_config = SingleSample(sample=self.train_model_config.samples[0])
+            dataset_name = "single"
         exp_paths = ExpPaths(
             exp_dir=model_dir / self.train_model_config.name,
             tomo_dir=features_dir,
@@ -791,7 +829,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         train_config = TrainModelConfig(
             exp_name=self.train_model_config.name,
             label_key=self.train_model_config.label_key,
-            aux_keys=("data",),
             save_pretrained=True,
             random_seed=seed,
             model=model_config,
@@ -799,10 +836,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             dataset=dataset_config,
             exp_paths=exp_paths,
         )
-        train_command = "python -m cryovit.train_model"
-        train_command += self._create_command_from_config(
+        train_commands = ["-m", "cryovit.train_model"]
+        # Add in dataclass config
+        train_commands += [
+            f"model={model_name}",
+            f"dataset={dataset_name}",
+            "trainer=trainer_fit",
+        ]
+        train_commands += self._create_command_from_config(
             train_config,
             [
+                "aux_keys",
                 "dataloader",
                 "cryovit_root",
                 "test_samples",
@@ -816,7 +860,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             ],
         )
         # Add in additional settings
-        train_command += f" dataloader.batch_size={batch_size} 'trainer.logger=[]'"
+        train_commands += [
+            # f"dataloader.batch_size={batch_size}",
+            "trainer.logger=[]",
+            "hydra.mode=RUN",
+        ]
         # Save model config
         self.train_model_config.model_weights = (
             Path(exp_paths.exp_dir) / self.train_model_config.name / "weights.pt"
@@ -826,70 +874,101 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Setup QProcesses
         self.train_process = QProcess()
         self.train_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, self.train_process)
+            partial(self._handle_stdout, "train_process")
         )
         self.train_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, self.train_process)
+            partial(self._handle_stderr, "train_process")
+        )
+        self.train_process.stateChanged.connect(
+            partial(self._handle_state_change, "train_process")
         )
         self.train_process.finished.connect(self._train_process_finish)
 
         self.dino_process = QProcess()
         self.dino_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, self.dino_process)
+            partial(self._handle_stdout, "dino_process")
         )
         self.dino_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, self.dino_process)
+            partial(self._handle_stderr, "dino_process")
+        )
+        self.dino_process.stateChanged.connect(
+            partial(self._handle_state_change, "dino_process")
         )
         self.dino_process.finished.connect(
-            partial(self._dino_process_finish, self.train_process, train_command)
+            partial(self._dino_process_finish, "train_process", train_commands)
         )
         self.log("info", f"Running DINO features:")
-        self.dino_process.start(dino_command)
+        # self.log("debug", f"Command: {dino_commands}")
+        self.log("debug", f"Command: {train_commands}")
+        # self.dino_process.start("python", dino_commands)
+        self.train_process.start("python", train_commands)
 
-    def _create_command_from_config(
-        self, config: dataclass, excluded_keys: str = []
-    ) -> str:
+    def _create_command_from_config(self, config, excluded_keys: str = []) -> List[str]:
         """Create a command recursively from the config dataclass."""
+        dino_commands = []
         for f in fields(config):
             if f.name in excluded_keys:
                 continue
-            if isinstance(getattr(config, f.name), dataclass):
-                dino_command += " " + self._create_command_from_config(
-                    getattr(config, f.name), excluded_keys
-                )
-            elif isinstance(getattr(config, f.name), Iterable):
-                list_command = ",".join(map(str, getattr(config, f.name)))
-                dino_command += f" '{f.name}=[{list_command}]'"
+            if is_dataclass(getattr(config, f.name)):
+                dino_commands += [
+                    f.name + "." + cmd
+                    for cmd in self._create_command_from_config(
+                        getattr(config, f.name), excluded_keys
+                    )
+                ]
+            elif isinstance(getattr(config, f.name), list) or isinstance(
+                getattr(config, f.name), tuple
+            ):
+                list_commands = ", ".join(map(str, getattr(config, f.name)))
+                dino_commands += [f"{f.name}=[{list_commands}]"]
+            elif isinstance(getattr(config, f.name), Path):
+                dino_commands += [
+                    f"{f.name}='{str(getattr(config, f.name).resolve())}'"
+                ]
             else:
-                dino_command += f" {f.name}={getattr(config, f.name)}"
-        return dino_command
+                dino_commands += [f"{f.name}={getattr(config, f.name)}"]
+        return dino_commands
 
-    def _dino_process_finish(self, next_process: QProcess, next_command: str, *args):
+    def _dino_process_finish(self, next_process_name: str, next_command: str, *args):
         self.log("success", "DINO features complete. Running model...")
         self.dino_process = None
-        next_process.start(next_command)
+        self.log("debug", f"Command: {next_command}")
+        getattr(self, next_process_name).start("python", next_command)
 
     def _segment_process_finish(self):
         self.log("success", "Segmentation complete.")
         self.segment_process = None
+        QGuiApplication.restoreOverrideCursor()
 
     def _train_process_finish(self):
         self.log("success", "Training complete.")
         self.train_process = None
+        QGuiApplication.restoreOverrideCursor()
 
-    def _handle_stdout(self, process: QProcess):
-        data = process.readAllStandardOutput()
+    def _handle_stdout(self, process_name: str):
+        data = getattr(self, process_name).readAllStandardOutput()
         stdout = bytes(data).decode("utf-8")
-        self.log("info", stdout)
+        self.log("info", stdout, end="", use_timestamp=False)
 
-    def _handle_stderr(self, process: QProcess):
-        data = process.readAllStandardError()
+    def _handle_stderr(self, process_name: str):
+        data = getattr(self, process_name).readAllStandardError()
         stderr = bytes(data).decode("utf-8")
-        self.log("error", stderr)
+        self.log("error", stderr, end="", use_timestamp=False)
+
+    def _handle_state_change(self, process_name: str, state: QProcess.ProcessState):
+        match state:
+            case QProcess.ProcessState.NotRunning:
+                self.log("debug", f"{process_name} process not running.")
+            case QProcess.ProcessState.Starting:
+                self.log("debug", f"{process_name} process starting.")
+            case QProcess.ProcessState.Running:
+                self.log("debug", f"{process_name} process running.")
+            case _:
+                self.log("warning", f"{process_name} process unknown state.")
 
     def setup_console(self):
-        sys.stdout = EmittingStream(textWritten=partial(self.log, "info", end=""))
-        sys.stderr = EmittingStream(textWritten=partial(self.log, "error", end=""))
+        sys.stdout = EmittingStream(textWritten=partial(self.log, "info"))
+        sys.stderr = EmittingStream(textWritten=partial(self.log, "error"))
 
     def setup_checkboxes(self):
         # Update from current checkbox state
@@ -1356,9 +1435,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 text.lower(),
                 "",
                 ModelArch[text],
+                "",
                 {},
                 samples,
-                {},
             )
         self.train_model_config.model_type = ModelArch[text]
 
@@ -1369,10 +1448,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.train_model_config = InterfaceModelConfig(
                 self.modelComboTrain.currentText().lower(),
                 "",
-                ModelArch[self.modelComboTrain.currentText()],
+                ModelArch[text],
+                "",
                 {},
                 samples,
-                {},
             )
         self.train_model_config.samples = samples
 
@@ -1400,8 +1479,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         config_dialog.exec()
         if config_dialog.result() == config_dialog.DialogCode.Accepted:
             self.train_model_config = config_dialog.config
+            self.train_model_config.model_weights = (
+                Path(self.settings.get_setting("model/model_directory"))
+                / self.train_model_config.name
+                / "weights.pt"
+            )
             self.trainer_config = config_dialog.trainer_config
-            self.sampleSelectCombo.setCurrentData(self.train_model_config.samples)
+            if self.train_model_config.samples:
+                self.sampleSelectCombo.setCurrentData(self.train_model_config.samples)
             self.log("success", "Training configuration updated.")
 
     def setup_run_buttons(self):
@@ -1547,18 +1632,25 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Update the progress bar with the current index (assume 0-indexed) and total."""
         self.progressBar.setValue((index // total) * self.progressBar.maximum())
 
-    def log(self, mode: str, text: str, end="\n"):
+    def log(self, mode: str, text: str, end="\n", use_timestamp: bool = True):
         """Write text to the console with a timestamp and different colors for normal output and errors."""
         import time
 
-        # Check for whitespaces (no timestamp)
+        # Ignore newlines but print whitespaces (no timestamp)
         if not text.strip():
-            self.consoleText.insertPlainText(text)
-            return
+            if text == "\n":
+                return
+            else:
+                self.consoleText.insertPlainText(text)
+                return
         # Get timestamp
         timestamp_str = "{}> ".format(time.strftime("[%H:%M:%S]"))
         # Format text with colors and timestamp
-        full_text = timestamp_str + text + end
+        if use_timestamp:
+            full_text = timestamp_str + text + end
+        else:
+            full_text = text + end
+        # Format text with colors
         match mode:
             case "error":
                 full_text = '<font color="#FF4500">{}</font>'.format(full_text)
@@ -1566,6 +1658,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 full_text = '<font color="#FFA500">{}</font>'.format(full_text)
             case "success":
                 full_text = '<font color="#32CD32">{}</font>'.format(full_text)
+            case "debug":
+                full_text = '<font color="#1E90FF">{}</font>'.format(full_text)
             case _:
                 full_text = '<font color="white">{}</font>'.format(full_text)
         # Add line breaks in HTML
@@ -1587,10 +1681,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         event.accept()
 
 
-app = QApplication(sys.argv)
-app.setStyle("Fusion")
+if __name__ == "__main__":
+    # Setup application
+    QGuiApplication.setHighDpiScaleFactorRoundingPolicy(
+        Qt.HighDpiScaleFactorRoundingPolicy.RoundPreferFloor
+    )
 
-window = MainWindow()
-window.show()
+    app = QApplication(sys.argv)
+    app.setApplicationName("CryoViT")
+    app.setOrganizationName("Stanford University")
+    app.setOrganizationDomain("stanford.edu")
+    app.setStyle("Fusion")
 
-app.exec()
+    window = MainWindow()
+    window.show()
+
+    app.exec()

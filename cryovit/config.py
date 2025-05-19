@@ -18,6 +18,7 @@ class Sample(Enum):
     WT = "WT"
     Q109 = "Q109"
     Q18 = "Q18"
+    Q66 = "Q66"
 
 
 samples = [sample.name for sample in Sample]
@@ -54,7 +55,7 @@ class DinoFeaturesConfig:
     csv_dir: Union[Path, None]
     feature_dir: Path
     batch_size: int
-    sample: Sample | List[Sample]
+    sample: List[Sample]
     all_samples: str = ",".join(samples)
     cryovit_root: Optional[Path] = None
 
@@ -407,6 +408,18 @@ class InterfaceModelConfig:
     model_weights: Path
     model_params: Dict[str, Union[str, int, float]]
     samples: List[str]
+
+    def to_json(self) -> dict:
+        """Convert the model configuration to a JSON serializable format."""
+        json_dict = {
+            "name": self.name,
+            "label_key": self.label_key,
+            "model_type": self.model_type.name,
+            "model_weights": str(self.model_weights.resolve()),
+            "model_params": dict(self.model_params),
+            "samples": list(map(str, self.samples)),
+        }
+        return json_dict
 
 
 cs = ConfigStore.instance()
