@@ -190,7 +190,10 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                 QFormLayout, f"formLayout_{parent_name}"
             )
             settings_path = variable_name.replace("__", "/")
-            label = QLabel(parent=parent_widget, text=field.name.capitalize())
+            label = QLabel(
+                parent=parent_widget,
+                text=" ".join(map(str.capilatize, field.name.split("_"))),
+            )
             match field.type.__qualname__:
                 case str.__qualname__:
                     data = QLineEdit(
@@ -398,9 +401,7 @@ class BaseSetting:
 class GeneralSettings(BaseSetting):
     """Dataclass to hold general settings relating to the GUI application."""
 
-    data_dir: str = ""
-    dino_dir: str = ""
-    features_dir: str = ""
+    data_directory: str = ""
 
 
 @dataclasses.dataclass
@@ -422,7 +423,14 @@ class PreprocessingSettings(BaseSetting):
 
 @dataclasses.dataclass
 class ModelSettings(BaseSetting):
-    model_dir: str = ""
+    model_directory: str = ""
+
+
+@dataclasses.dataclass
+class DinoSettings(BaseSetting):
+    model_directory: str = ""
+    features_directory: str = ""
+    batch_size: int = 128
 
 
 @dataclasses.dataclass
@@ -433,17 +441,16 @@ class SegmentationSettings(BaseSetting):
 
 @dataclasses.dataclass
 class AnnotationSettings(BaseSetting):
-    chimerax_path: str = ""
+    chimera_path: str = ""
     num_slices: int = 5
 
 
 @dataclasses.dataclass
 class TrainingSettings(BaseSetting):
     splits_file: str = ""
-    splits: int = 10
+    number_of_splits: int = 10
     batch_size: int = 1
-    split_id: int = 0
-    split_seed: int = 42
+    random_seed: int = 42
 
 
 @dataclasses.dataclass
@@ -456,6 +463,7 @@ class Settings(BaseSetting):
         default_factory=PreprocessingSettings
     )
     model: ModelSettings = dataclasses.field(default_factory=ModelSettings)
+    dino: DinoSettings = dataclasses.field(default_factory=DinoSettings)
     segmentation: SegmentationSettings = dataclasses.field(
         default_factory=SegmentationSettings
     )

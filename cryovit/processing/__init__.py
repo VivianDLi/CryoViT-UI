@@ -9,12 +9,8 @@ from cryovit.processing.annotations import (
 from cryovit.processing.model import (
     get_available_models,
     get_model_configs,
-    save_model,
-    load_model,
-    load_base_model,
-    get_dino_features,
-    train_model,
-    run_inference,
+    save_model_config,
+    load_base_model_config,
 )
 
 chimera_script_path = __file__.replace("__init__.py", "chimera_slices.py")
@@ -26,11 +22,7 @@ __all__ = [
     "generate_new_splits",
     "get_available_models",
     "get_model_configs",
-    "save_model",
-    "load_model",
-    "load_base_model",
-    "get_dino_features",
-    "train_model",
-    "run_inference",
+    "save_model_config",
+    "load_base_model_config",
     "chimera_script_path",
 ]

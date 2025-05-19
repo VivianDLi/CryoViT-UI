@@ -10,6 +10,8 @@ from h5py import File
 import numpy as np
 import torch
 
+from cryovit.config import tomogram_exts
+
 # Setup logger
 logger = logging.getLogger(__name__)
 handler = logging.StreamHandler(sys.stdout)
@@ -56,9 +58,7 @@ def run_preprocess(
         normalize (bool, optional): Whether to normalize tomogram values. Defaults to True.
         clip (bool, optional): Whether to clip normalized values to +/- 3 std devs. Defaults to True.
     """
-    files = list(
-        p.resolve() for p in src_dir.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
-    )
+    files = list(p.resolve() for p in src_dir.glob("*") if p.suffix in tomogram_exts)
     logger.info(f"Found {len(files)} files in {src_dir}.")
     for file_name in tqdm(files, desc="Pre-processing tomograms"):
         logger.debug(f"Processing {file_name}.")

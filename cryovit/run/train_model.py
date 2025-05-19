@@ -2,7 +2,9 @@
 
 import logging
 import os
+from pathlib import Path
 
+from omegaconf import OmegaConf
 import torch
 import wandb
 from hydra.core.hydra_config import HydraConfig
@@ -12,10 +14,8 @@ from pytorch_lightning import seed_everything
 
 from cryovit.config import ExpPaths
 from cryovit.config import Sample
-from cryovit.config import TrainModelConfig
+from cryovit.config import PretrainedModel, TrainModelConfig
 
-
-seed_everything(42, workers=True)
 torch.set_float32_matmul_precision("high")
 logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
 logging.getLogger("torch._inductor").setLevel(logging.WARNING)
@@ -114,8 +114,10 @@ def run_trainer(cfg: TrainModelConfig) -> None:
     Args:
         cfg (TrainModelConfig): Configuration object containing all settings for the training process.
     """
+    seed_everything(cfg.random_seed, workers=True)
     exp_paths = cfg.exp_paths
-    setup_params(exp_paths, cfg)
+    if not cfg.save_pretrained:
+        setup_params(exp_paths, cfg)
     set_wandb_config(cfg)
 
     datamodule = build_datamodule(cfg)
@@ -129,6 +131,24 @@ def run_trainer(cfg: TrainModelConfig) -> None:
         val_dataloaders=datamodule.test_dataloader(),
     )
 
+    # Save model weights
     torch.save(model.state_dict(), (exp_paths.exp_dir / "weights.pt"))
     torch.cuda.empty_cache()
+    # Save model config to configs/models/
+    if cfg.save_pretrained:
+        model_type = str(HydraConfig.get().runtime.choices.model)
+        conf = OmegaConf.structured(
+            PretrainedModel(
+                name=cfg.exp_name,
+                label_key=cfg.label_key,
+                model_weights=exp_paths.exp_dir / "weights.pt",
+                model_type=model_type.upper(),
+                model=cfg.model,
+            )
+        )
+        search_paths = HydraConfig.get().runtime.config_sources
+        config_dir = [
+            path["path"] for path in search_paths if path["provider"] == "main"
+        ][0]
+        OmegaConf.save(conf, Path(config_dir) / "models" / f"{cfg.exp_name}.yaml")
     wandb.finish(quiet=True)

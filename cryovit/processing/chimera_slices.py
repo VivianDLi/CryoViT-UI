@@ -91,7 +91,7 @@ def set_tomogram_slices(
     os.makedirs(csv_path.parent, exist_ok=True)
     slice_n = num_slices
     files = list(
-        p.resolve() for p in src_path.glob("*") if p.suffix in {".rec", ".mrc", ".hdf"}
+        p.resolve() for p in src_path.glob("*") if p.suffix in [".rec", ".mrc", ".hdf"]
     )
     file_n = 0
     csv_data = []

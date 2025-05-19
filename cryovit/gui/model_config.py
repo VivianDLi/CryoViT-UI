@@ -29,13 +29,10 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         self.config = model_config
         self.trainer_config = trainer_config
         self.param_dict = []
-        self.metrics_dict = []
         # Setup UI
         self.archCombo.addItems(models)
         self.paramAdd.clicked.connect(self.add_param)
         self.paramRemove.clicked.connect(self.remove_param)
-        self.metricsAdd.clicked.connect(self.add_metric)
-        self.metricsRemove.clicked.connect(self.remove_metric)
         if self.trainer_config:
             self.trainerConfigGroup.setVisible(True)
         else:
@@ -136,57 +133,6 @@ class ModelDialog(QDialog, Ui_ModelDialog):
             delattr(self, f"paramLabel_{index}")
             delattr(self, f"paramValue_{index}")
 
-    def add_metric(self):
-        name, ok = QInputDialog.getText(
-            self,
-            "Add Parameter",
-            "Enter the name of the parameter:",
-            QLineEdit.EchoMode.Normal,
-        )
-        if not ok or not name:
-            return
-        self._add_metric(name, 0.0)
-
-    def add_metrics(self, metrics: Dict[str, float]):
-        for name, value in metrics.items():
-            self._add_metric(name, value)
-
-    def _add_metric(self, name: str, value: float):
-        metric_name = QLineEdit(name)
-        metric_value = QDoubleSpinBox()
-        metric_value.setValue(value)
-        self.metrics_dict.append({"name": name, "value": value})
-        index = len(self.metrics_dict) - 1
-        metric_name.editingFinished.connect(
-            lambda: self.metrics_dict[index].update({"name": metric_name.text()})
-        )
-        metric_value.valueChanged.connect(
-            lambda: self.metrics_dict[index].update({"value": metric_value.value()})
-        )
-        # Prevent garbage collection
-        setattr(self, f"metricLabel_{index}", metric_name)
-        setattr(self, f"metricValue_{index}", metric_value)
-        self.metricsLayout.insertRow(
-            self.metricsLayout.rowCount() - 1, metric_name, metric_value
-        )
-
-    def remove_metric(self):
-        name, ok = QInputDialog.getText(
-            self,
-            "Remove Metric",
-            "Enter the name of the metric to remove:",
-            QLineEdit.EchoMode.Normal,
-        )
-        if not ok or not name:
-            return
-        metric_names = [m["name"] for m in self.metrics_dict]
-        if name in metric_names:
-            index = metric_names.index(name)
-            self.metrics_dict.pop(index)
-            self.metricsLayout.removeRow(index)
-            delattr(self, f"metricLabel_{index}")
-            delattr(self, f"metricValue_{index}")
-
     def validate_config(self):
         try:
             self.config.name = self.nameDisplay.text()
@@ -203,9 +149,6 @@ class ModelDialog(QDialog, Ui_ModelDialog):
             if not self.config.samples:
                 self.parent.log("error", "Samples cannot be empty.")
                 return False
-            self.config.metrics = {
-                m["name"]: float(m["value"]) for m in self.metrics_dict if m["name"]
-            }
 
             if self.trainer_config:
                 self.trainer_config.accelerator = self.accelCombo.currentText()
@@ -233,7 +176,6 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         self.samplesDisplay.setText(
             ", ".join(self.config.samples) if self.config.samples else ""
         )
-        self.add_metrics(self.config.metrics)
         if self.trainer_config:
             self.accelCombo.setCurrentText(self.trainer_config.accelerator)
             self.devicesDisplay.setText(self.trainer_config.devices)

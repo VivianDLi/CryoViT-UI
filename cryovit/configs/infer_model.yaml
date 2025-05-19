@@ -1,0 +1,23 @@
+label_keys:
+  - mito
+
+model_weights:
+  - ${exp_paths.exp_dir}/${exp_name}.pt
+
+exp_paths:
+  cryovit_root: /sdf/home/c/cathyhou/projects/test/CryoVIT
+  exp_dir: ${.cryovit_root}/experiments/${exp_name}
+  tomo_dir: ${.cryovit_root}/data/dino_features
+  split_file: ${.cryovit_root}/data/csv/splits.csv
+
+#################### Do not modify #####################
+
+defaults:
+  - models: ???
+  - dataset: inference
+  - trainer: trainer_infer
+  - infer_model_config
+  - _self_
+  - override hydra/hydra_logging: rich_logger
+  - override hydra/job_logging: rich_logger
+

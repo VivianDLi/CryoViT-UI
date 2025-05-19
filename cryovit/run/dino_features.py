@@ -3,6 +3,7 @@
 import os
 import shutil
 from pathlib import Path
+from typing import List, Union
 
 import h5py
 import numpy as np
@@ -13,7 +14,7 @@ from rich.progress import track
 from torch import nn
 from torch.utils.data import DataLoader
 
-from cryovit.config import Sample
+from cryovit.config import Sample, tomogram_exts
 from cryovit.datasets import VITDataset
 
 
@@ -81,38 +82,51 @@ def save_data(
 
 def process_sample(
     dino_dir: Path,
-    data_dir: Path,
+    tomo_dir: Path,
+    csv_dir: Path | None,
     feature_dir: Path,
     batch_size: int,
-    sample: Sample,
+    sample: Union[Sample, List[Sample]],
     **kwargs,
 ) -> None:
     """Process all tomograms in a sample by extracting and saving their DINOv2 features.
 
     Args:
         dino_dir (Path): The directory where the DINOv2 model is stored.
-        data_dir (Path): The directory containing the tomograms and associated CSV files.
+        tomo_dir (Path): The directory containing the tomograms.
+        csv_dir (Path): The directory containing the associated CSV files. If None, uses all tomograms in tomo_dir.
         feature_dir (Path): The directory where the extracted features should be saved.
         batch_size (int): The number of 2D slices of a tomograms processed in each batch.
-        sample (Sample): Enum specifying the sample to be processed.
+        sample (Union[Sample, List[Sample]]): Enum or list of Enums specifying the sample(s) to be processed.
     """
-    src_dir = data_dir / "tomograms" / sample.name
-    dst_dir = feature_dir / sample.name
-
-    record_file = data_dir / "csv" / f"{sample.name}.csv"
-    records = pd.read_csv(record_file)["tomo_name"]
-
-    dataset = VITDataset(records, root=src_dir)
-    dataloader = DataLoader(dataset, **dataloader_params)
 
     torch.hub.set_dir(dino_dir)
     model = torch.hub.load(*dino_model, verbose=False).cuda()
     model.eval()
 
-    for i, x in track(
-        enumerate(dataloader),
-        description=f"[green]Computing features for {sample.name}",
-        total=len(dataloader),
-    ):
-        features = dino_features(x, model, batch_size)
-        save_data(features, records[i], src_dir, dst_dir)
+    for s in sample:
+        src_dir = tomo_dir / s.name
+        dst_dir = feature_dir / s.name
+
+        if csv_dir is None:
+            records = pd.DataFrame(
+                {
+                    "tomo_name": [
+                        f.name for f in src_dir.glob("*") if f.suffix in tomogram_exts
+                    ]
+                }
+            )
+        else:
+            record_file = csv_dir / f"{s.name}.csv"
+            records = pd.read_csv(record_file)["tomo_name"]
+
+        dataset = VITDataset(records, root=src_dir)
+        dataloader = DataLoader(dataset, **dataloader_params)
+
+        for i, x in track(
+            enumerate(dataloader),
+            description=f"[green]Computing features for {s.name}",
+            total=len(dataloader),
+        ):
+            features = dino_features(x, model, batch_size)
+            save_data(features, records[i], src_dir, dst_dir)

@@ -31,13 +31,17 @@ class ModelArch(Enum):
 models = [model.name for model in ModelArch]
 
 
+tomogram_exts = [".rec", ".mrc", ".hdf"]
+
+
 @dataclass
 class DinoFeaturesConfig:
     """Configuration for managing Dino features within CryoVIT experiments.
 
     Attributes:
         dino_dir (Path): Path to the DINOv2 foundation model.
-        data_dir (Path): Directory containing tomograms and CSV files.
+        tomo_dir (Path): Directory containing tomograms for feature extraction.
+        csv_dir (Path): Directory containing CSV files with tomogram metadata.
         feature_dir (Path): Destination to save the generated DINOv2 features.
         batch_size (int): Batch size: number of slices in one batch.
         sample (Sample): Enum representing a specific sample under study.
@@ -46,10 +50,11 @@ class DinoFeaturesConfig:
     """
 
     dino_dir: Path
-    data_dir: Path
+    tomo_dir: Path
+    csv_dir: Union[Path, None]
     feature_dir: Path
     batch_size: int
-    sample: Sample
+    sample: Sample | List[Sample]
     all_samples: str = ",".join(samples)
     cryovit_root: Optional[Path] = None
 
@@ -100,6 +105,27 @@ class UNet3D(Model):
 
 
 @dataclass
+class PretrainedModel:
+    """Configuration for managing pretrained models in CryoVIT experiments.
+
+    Attributes:
+        name (str): Name of the pretrained model, must be unique for each configuration.
+        label_key (str): Key used to specify the training label.
+        samples (List[str]): List of sample names used for training.
+        model_weights (Path): Directory containing the pretrained model weights.
+        model_type (ModelArch): Architecture type of the pretrained model.
+        model (Model): The pretrained model configuration.
+        _partial_ (bool): Flag to indicate this is a partial configuration.
+    """
+
+    name: str = MISSING
+    label_key: str = MISSING
+    model_weights: Path = MISSING
+    model_type: ModelArch = MISSING
+    model: Model = MISSING
+
+
+@dataclass
 class Trainer:
     """Base class for trainer configurations used in CryoVIT experiments.
 
@@ -144,6 +170,19 @@ class TrainerEval(Trainer):
 
     Attributes:
         logger (bool): Flag to enable or disable logging during evaluation.
+        enable_model_summary (bool): Flag to enable or disable generation of model summaries.
+    """
+
+    logger: bool = False
+    enable_model_summary: bool = False
+
+
+@dataclass
+class TrainerInfer(Trainer):
+    """Configuration for model inference in CryoVIT experiments.
+
+    Attributes:
+        logger (bool): Flag to enable or disable logging during inference.
         enable_model_summary (bool): Flag to enable or disable generation of model summaries.
     """
 
@@ -229,6 +268,17 @@ class FractionalLOO(Dataset):
 
 
 @dataclass
+class Inference(Dataset):
+    """Configuration for inference dataset in CryoVIT experiments.
+
+    Attributes:
+        _target_ (str): Class identifier for instantiating this dataset.
+    """
+
+    _target_: str = "cryovit.data_modules.InferenceDataModule"
+
+
+@dataclass
 class ExpPaths:
     """Configuration for managing experiment paths in CryoVIT experiments.
 
@@ -276,6 +326,8 @@ class TrainModelConfig:
         exp_name (str): The name of the experiment, must be unique for each configuration.
         label_key (str): Key used to specify the training label: mito or mito_ai.
         aux_keys (Tuple[str]): Additional keys to load auxiliary data from tomograms.
+        random_seed (int): Random seed for reproducibility.
+        save_pretrained (bool): Flag to indicate if to use simplified exp_dir and save model as a hydra config.
         model (Model): The model configuration to be used for training.
         trainer (TrainerFit): Trainer configuration tailored for training sessions.
         dataset (Dataset): Dataset configuration to be used for model training.
@@ -286,6 +338,8 @@ class TrainModelConfig:
     exp_name: str = MISSING
     label_key: str = MISSING
     aux_keys: Tuple[str] = ()
+    random_seed: int = 42
+    save_pretrained: bool = False
 
     model: Model = MISSING
     trainer: TrainerFit = MISSING
@@ -321,23 +375,38 @@ class EvalModelConfig:
 
 
 @dataclass
-class InterfaceModelConfig:
-    """Metadata for a model for GUI use.
+class InferModelConfig:
+    """Configuration for inferring using model(s) for CryoViT use.
 
     Attributes:
-        name (str): Name of the model.
-        label_key (str): Key used to specify the training label.
-        model_type (ModelArch): The type of model/model architecture used: cryovit or unet3d.
-        training_sample (Union[str, List[str]]): Sample(s) used for training the model.
-        val_accuracy (float): Accuracy of the model on the training sample(s).
+        label_keys (Tuple[str]): Keys used to specify the training labels of models.
+        model_weights (Tuple[Path]): Paths to the model weights for pre-trained models.
+        models (Tuple[Modle]): The model configurations to be used for inference.
+        trainer (TrainerInfer): Trainer configuration specifically designed for inference sessions.
+        dataset (Dataset): Dataset configuration intended for model inference.
+        exp_paths (ExpPaths): Configuration paths relevant to the experiment.
+        dataloader (DataLoader): DataLoader configuration optimized for inference scenarios.
     """
+
+    aux_keys: Tuple[str] = ("data",)
+
+    models: Tuple[PretrainedModel] = MISSING
+    trainer: TrainerInfer = MISSING
+    dataset: Dataset = MISSING
+    exp_paths: ExpPaths = MISSING
+    dataloader: DataLoader = field(default=DataLoader())
+
+
+@dataclass
+class InterfaceModelConfig:
+    """Metadata for a model for GUI use."""
 
     name: str
     label_key: str
     model_type: ModelArch
+    model_weights: Path
     model_params: Dict[str, Union[str, int, float]]
-    samples: List[str]  # list of samples used for training
-    metrics: Dict[str, float]
+    samples: List[str]
 
 
 cs = ConfigStore.instance()
@@ -348,11 +417,14 @@ cs.store(group="model", name="unet3d", node=UNet3D)
 
 cs.store(group="trainer", name="trainer_fit", node=TrainerFit)
 cs.store(group="trainer", name="trainer_eval", node=TrainerEval)
+cs.store(group="trainer", name="trainer_infer", node=TrainerInfer)
 
 cs.store(group="dataset", name="single", node=SingleSample)
 cs.store(group="dataset", name="multi", node=MultiSample)
 cs.store(group="dataset", name="loo", node=LOOSample)
 cs.store(group="dataset", name="fractional", node=FractionalLOO)
+cs.store(group="dataset", name="inference", node=Inference)
 
 cs.store(name="train_model_config", node=TrainModelConfig)
 cs.store(name="eval_model_config", node=EvalModelConfig)
+cs.store(name="infer_model_config", node=InferModelConfig)

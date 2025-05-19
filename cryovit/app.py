@@ -4,8 +4,12 @@ import os
 from pathlib import Path
 import sys
 from functools import partial
+from dataclasses import dataclass, fields
 import platform
 import traceback
+import subprocess
+from typing import List
+from collections.abc import Iterable
 
 from PyQt6.QtWidgets import (
     QApplication,
@@ -29,7 +33,20 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QDesktopServices, QGuiApplication
 
-from cryovit.config import InterfaceModelConfig, ModelArch, models
+from cryovit.config import (
+    DinoFeaturesConfig,
+    ExpPaths,
+    MultiSample,
+    PretrainedModel,
+    SingleSample,
+    Inference,
+    TrainModelConfig,
+    InferModelConfig,
+    InterfaceModelConfig,
+    ModelArch,
+    samples,
+    models,
+)
 import cryovit.gui.resources
 from cryovit.gui.layouts.mainwindow import Ui_MainWindow
 from cryovit.gui.model_config import ModelDialog, TrainerFit
@@ -120,9 +137,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         # Setup settings
         self.settings = SettingsWindow(self)
-        # Setup thread pool
+        # Setup thread pool and processes
         self.threadpool: QThreadPool = QThreadPool.globalInstance()
         self.progress_dict = {}
+        self.chimera_process = None
+        self.dino_process = None
+        self.segment_process = None
+        self.train_process = None
 
         # Setup UI elements
         try:
@@ -206,13 +227,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("ChimeraX")
     def run_chimerax(self, *args):
-        chimerax_path = self.settings.get_setting("annotation/chimerax_path")
+        chimerax_path = self.settings.get_setting("annotation/chimera_path")
         if not chimerax_path and platform.system().lower() != "linux":
             self.log(
                 "warning",
                 "ChimeraX path not set. Please set it in the settings.",
             )
             return
+        else:
+            chimerax_path = Path(chimerax_path if chimerax_path else "").resolve()
 
         # Get directories from settings
         samples = self.sampleSelectCombo.getCurrentData()
@@ -250,52 +273,88 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         num_slices = self.settings.get_setting("annotation/num_slices")
         # Check for no samples
         if not samples:
-            if not os.path.isdir(src_dir):
-                self.log(
-                    "error",
-                    f"Invalid raw directory: {src_dir}.",
-                )
-                return
-            self._launch_chimerax(
-                chimerax_path,
-                src_dir,
-                dst_dir=dst_dir,
-                csv_dir=csv_dir,
-                num_slices=num_slices,
+            self._next_chimera_process(
+                0, chimerax_path, src_dir, None, dst_dir, csv_dir, num_slices
             )
-            if self.chimera_process:
-                self.chimera_process.waitForFinished(-1)
-                self.chimera_process = None
         else:
-            for i in range(len(samples)):
-                # Check for valid directories
-                if not os.path.isdir(src_dir / samples[i]):
-                    self.log(
-                        "error",
-                        f"Invalid raw directory: {src_dir / samples[i]}, skipping sample.",
-                    )
-                    continue
-                self._launch_chimerax(
-                    chimerax_path if chimerax_path else "",
-                    src_dir,
-                    samples[i],
-                    dst_dir=dst_dir,
-                    csv_dir=csv_dir,
-                    num_slices=num_slices,
-                )
-                if self.chimera_process:
-                    self.chimera_process.waitForFinished(-1)
-                    self._update_progress_bar(i, len(samples))
-                    self.chimera_process = None
-                else:
-                    self.log(
-                        "error",
-                        f"ChimeraX process for src_dir: {src_dir / samples[i]} failed.",
-                    )
-                    continue
-        self.log("success", "ChimeraX processing complete.")
+            self._next_chimera_process(
+                0, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+            )
 
-    def _launch_chimerax(
+    def _next_chimera_process(
+        self,
+        index: int,
+        chimerax_path: Path,
+        src_dir: Path,
+        samples: List[str] | None,
+        dst_dir: Path,
+        csv_dir: Path,
+        num_slices: int,
+    ):
+        """Launch the next ChimeraX process."""
+        self.chimera_process = None
+        if samples:
+            self._update_progress_bar(index + 1, len(samples))
+            if index >= len(samples):
+                self.log("success", "ChimeraX processing complete.")
+                return
+            sample = samples[index]
+            is_dir = os.path.isdir(src_dir / sample)
+        else:
+            if index >= 1:
+                self.log("success", "ChimeraX processing complete.")
+                return
+            sample = None
+            is_dir = os.path.isdir(src_dir)
+        if not is_dir:
+            self.log(
+                "error",
+                f"Invalid raw directory: {src_dir / sample if sample else src_dir}, skipping sample.",
+            )
+            self._next_chimera_process(
+                index + 1, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+            )
+            return
+        command = self._validate_chimerax_process(
+            chimerax_path,
+            src_dir,
+            sample,
+            dst_dir=dst_dir,
+            csv_dir=csv_dir,
+            num_slices=num_slices,
+        )
+        if command is not None:
+            self.chimera_process = QProcess()
+            self.chimera_process.readyReadStandardOutput.connect(
+                partial(self._handle_stdout, self.chimera_process)
+            )
+            self.chimera_process.readyReadStandardError.connect(
+                partial(self._handle_stderr, self.chimera_process)
+            )
+            self.chimera_process.finished.connect(
+                partial(
+                    self._next_chimera_process,
+                    index + 1,
+                    chimerax_path,
+                    src_dir,
+                    samples,
+                    dst_dir,
+                    csv_dir,
+                    num_slices,
+                )
+            )
+            self.chimera_process.start(command)
+        else:
+            self.log(
+                "error",
+                f"ChimeraX process for src_dir: {src_dir / sample if sample else src_dir} failed.",
+            )
+            self._next_chimera_process(
+                index + 1, chimerax_path, src_dir, samples, dst_dir, csv_dir, num_slices
+            )
+            return
+
+    def _validate_chimerax_process(
         self,
         chimerax_path: str,
         src_dir: Path,
@@ -303,10 +362,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         dst_dir: Path = None,
         csv_dir: Path = None,
         num_slices: int = 5,
-    ):
-        import subprocess
-
-        self.chimera_process = QProcess()
+    ) -> str | None:
+        if self.chimera_process is not None:
+            return None
         # Create script args
         commands = [
             "open",
@@ -338,12 +396,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     return None
                 # Copy command to clipboard
                 subprocess.check_call("echo " + command + " | clip", shell=True)
-                # Launch ChimeraX normally
-                self.chimera_process.start(chimerax_path)
             case "linux":  # Has chimerax from command line
                 # Copy command to clipboard
                 subprocess.check_call("echo " + command + " | xsel -ib", shell=True)
-                self.chimera_process.start("chimerax")
+                chimerax_path = "chimerax"
             case "darwin":  # Needs to be run from a specific path
                 if not os.path.isfile(
                     chimerax_path
@@ -355,10 +411,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     return None
                 # Copy command to clipboard
                 subprocess.check_call("echo " + command + " | pbcopy", shell=True)
-                self.chimera_process.start(chimerax_path)
             case _:
                 self.log("error", f"Unsupported OS type {platform.system()}.")
-        return self.chimera_process
+                return None
+        return chimerax_path
 
     @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
@@ -379,8 +435,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No CSV directory specified.")
             return
-        num_splits = self.settings.get_setting("training/splits")
-        seed = self.settings.get_setting("training/split_seed")
+        num_splits = self.settings.get_setting("training/number_of_splits")
+        seed = self.settings.get_setting("training/random_seed")
         if not self.features:
             self.log(
                 "warning",
@@ -473,8 +529,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No CSV directory specified. Please specify a CSV directory.",
             )
             return
-        num_splits = self.settings.get_setting("training/splits")
-        seed = self.settings.get_setting("training/split_seed")
+        num_splits = self.settings.get_setting("training/number_of_splits")
+        seed = self.settings.get_setting("training/random_seed")
 
         splits_file = self.settings.get_setting("training/splits_file")
         if splits_file:
@@ -517,8 +573,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
+        if self.dino_process is not None or self.segment_process is not None:
+            self.log(
+                "warning",
+                "Cannot run training: Another process is already running.",
+            )
+            return
         # Check for required settings
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if model_dir:
             model_dir = Path(model_dir).resolve()
         else:
@@ -527,7 +589,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
             return
-        dino_dir = self.settings.get_setting("general/dino_dir")
+        dino_dir = self.settings.get_setting("dino/model_directory")
         if dino_dir:
             dino_dir = Path(dino_dir).resolve()
         else:
@@ -546,7 +608,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         replace_seg = self.replaceCheckboxSeg.isChecked()
         replace_seg_dir = self.replaceDirectorySeg
         dst_dir = Path(replace_seg_dir.text() if replace_seg else src_dir)
-        features_dir = self.settings.get_setting("general/features_dir")
+        features_dir = self.settings.get_setting("dino/features_directory")
         if features_dir:
             features_dir = Path(features_dir).resolve()
         else:
@@ -555,65 +617,98 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
             features_dir = src_dir
-        kwargs = {"batch_size": self.settings.get_setting("segmentation/batch_size")}
+        dino_batch_size = self.settings.get_setting("dino/batch_size")
+        batch_size = self.settings.get_setting("segmentation/batch_size")
         if self.settings.get_setting("segmentation/csv_file"):
-            kwargs["csv_file"] = self.settings.get_setting("segmentation/csv_file")
+            csv_file = self.settings.get_setting("segmentation/csv_file")
+            csv_file = Path(csv_file).resolve()
+        else:
+            csv_file = None
 
+        # Setup DINOv2 command
+        dino_config = DinoFeaturesConfig(
+            dino_dir=dino_dir,
+            tomo_dir=src_dir.parent,
+            csv_dir=None,
+            feature_dir=features_dir,
+            batch_size=dino_batch_size,
+            sample=[src_dir.name],
+        )
+        dino_command = "python -m cryovit.dino_features"
+        dino_command += self._create_command_from_config(
+            dino_config, ["all_samples", "cryovit_root"]
+        )
+
+        # Setup segmentation command
         # Get model list
-        model_names = [
-            page
-            for page in self._models
-            if self.modelTabs.indexOf(self._models[page]["widget"]) != -1
-        ]
-        models, configs = zip(*[load_model(model_dir, name) for name in model_names])
-
-        self.progress_dict["Segmentation"] = {"count": 0, "total": len(models) + 1}
-        dino_worker = Worker(
-            get_dino_features, dino_dir, src_dir, dst_dir=features_dir, **kwargs
+        model_names = ",".join(
+            [
+                str(page)
+                for page in self._models
+                if self.modelTabs.indexOf(self._models[page]["widget"]) != -1
+            ]
         )
-        dino_worker.signals.finish.connect(
-            partial(
-                self._run_inference,
-                models,
-                configs,
-                src_dir if features_dir is None else features_dir,
-                dst_dir=dst_dir,
-                **kwargs,
-            )
+        exp_paths = ExpPaths(
+            exp_dir=dst_dir, tomo_dir=features_dir, split_file=csv_file
         )
-        dino_worker.signals.error.connect(self._handle_thread_exception)
-        self.threadpool.start(dino_worker)
+        dataset_config = Inference()
+        infer_config = InferModelConfig(
+            models=[],
+            trainer=self.trainer_config,
+            dataset=dataset_config,
+            exp_paths=exp_paths,
+        )
+        infer_command = "python -m cryovit.infer_model"
+        infer_command += self._create_command_from_config(
+            infer_config,
+            [
+                "dataloader",
+                "cryovit_root",
+                "logger",
+                "callbacks",
+                "losses",
+                "metrics",
+                "models",
+                "_target_",
+                "_partial_",
+            ],
+        )
+        # Add in additional settings
+        infer_command += f" dataloader.batch_size={batch_size} 'models=[{model_names}]'"
 
-    def _run_inference(
-        self,
-        models,
-        configs,
-        src_dir: Path,
-        batch_size: int = None,
-        dst_dir: Path = None,
-        csv_file: Path = None,
-    ):
-        """Run inference on the model."""
-        finish_callback = partial(self._on_thread_finish, "Segmentation")
-        finish_callback()
-        for i in range(len(models)):
-            inference_worker = Worker(
-                run_inference,
-                models[i],
-                configs[i],
-                src_dir,
-                batch_size=batch_size,
-                dst_dir=dst_dir,
-                csv_file=csv_file,
-            )
-            inference_worker.signals.finish.connect(finish_callback)
-            inference_worker.signals.error.connect(self._handle_thread_exception)
-            self.threadpool.start(inference_worker)
+        # Setup QProcesses
+        self.segment_process = QProcess()
+        self.segment_process.readyReadStandardOutput.connect(
+            partial(self._handle_stdout, self.segment_process)
+        )
+        self.segment_process.readyReadStandardError.connect(
+            partial(self._handle_stderr, self.segment_process)
+        )
+        self.segmnet_process.finished.connect(self._segment_process_finish)
+
+        self.dino_process = QProcess()
+        self.dino_process.readyReadStandardOutput.connect(
+            partial(self._handle_stdout, self.dino_process)
+        )
+        self.dino_process.readyReadStandardError.connect(
+            partial(self._handle_stderr, self.dino_process)
+        )
+        self.dino_process.finished.connect(
+            partial(self._dino_process_finish, self.segment_process, infer_command)
+        )
+        self.log("info", f"Running DINO features:")
+        self.dino_process.start(dino_command)
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
+        if self.dino_process is not None or self.train_process is not None:
+            self.log(
+                "warning",
+                "Cannot run training: Another process is already running.",
+            )
+            return
         # Check for required settings
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if model_dir:
             model_dir = Path(model_dir).resolve()
         else:
@@ -622,7 +717,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
             return
-        dino_dir = self.settings.get_setting("general/dino_dir")
+        dino_dir = self.settings.get_setting("dino/model_directory")
         if dino_dir:
             dino_dir = Path(dino_dir).resolve()
         else:
@@ -655,7 +750,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             split_file = csv_dir / "splits.csv"
             self.settings.set_setting("training/splits_file", str(split_file))
-        features_dir = self.settings.get_setting("general/features_dir")
+        features_dir = self.settings.get_setting("dino/features_directory")
         if features_dir:
             features_dir = Path(features_dir).resolve()
         else:
@@ -664,59 +759,133 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
             features_dir = data_dir
+        dino_batch_size = self.settings.get_setting("dino/batch_size")
         batch_size = self.settings.get_setting("training/batch_size")
-        split_id = self.settings.get_setting("training/split_id")
-        seed = self.settings.get_setting("training/split_seed")
+        seed = self.settings.get_setting("training/random_seed")
 
-        self.progress_dict["Training"] = {"count": 0, "total": 2}
-        self.train_model = load_base_model(self.train_model_config)
-        dino_worker = Worker(
-            get_dino_features, dino_dir, data_dir, batch_size, dst_dir=features_dir
+        # Setup DINOv2 command
+        dino_config = DinoFeaturesConfig(
+            dino_dir=dino_dir,
+            tomo_dir=data_dir,
+            csv_dir=csv_dir,
+            feature_dir=features_dir,
+            batch_size=dino_batch_size,
+            sample=self.sampleSelectCombo.getCurrentData(),
         )
-        dino_worker.signals.finish.connect(
-            partial(
-                self._train_model,
-                self.train_model,
-                self.train_model_config,
-                self.trainer_config,
-                features_dir,
-                split_file,
-                batch_size,
-                split_id,
-                seed,
-            )
+        dino_command = "python -m cryovit.dino_features"
+        dino_command += self._create_command_from_config(
+            dino_config, ["all_samples", "cryovit_root"]
         )
-        dino_worker.signals.error.connect(self._handle_thread_exception)
-        self.threadpool.start(dino_worker)
 
-    def _train_model(
-        self,
-        model,
-        config: InterfaceModelConfig,
-        trainer_config: TrainerFit,
-        data_dir: Path,
-        split_file: Path,
-        batch_size: int,
-        split_id: int,
-        seed: int,
-    ):
-        """Train the model."""
-        finish_callback = partial(self._on_thread_finish, "Training")
-        finish_callback()
-        train_worker = Worker(
-            train_model,
-            model,
-            config,
-            trainer_config,
-            data_dir,
-            split_file,
-            batch_size,
-            split_id,
-            seed,
+        # Setup training command
+        model_config = load_base_model_config(self.train_model_config)
+        if len(self.train_model_config.samples) > 1:
+            dataset_config = MultiSample(sample=self.train_model_config.samples)
+        else:
+            dataset_config = SingleSample(sample=self.train_model_config.samples[0])
+        exp_paths = ExpPaths(
+            exp_dir=model_dir / self.train_model_config.name,
+            tomo_dir=features_dir,
+            split_file=split_file,
         )
-        train_worker.signals.finish.connect(finish_callback)
-        train_worker.signals.error.connect(self._handle_thread_exception)
-        self.threadpool.start(train_worker)
+        train_config = TrainModelConfig(
+            exp_name=self.train_model_config.name,
+            label_key=self.train_model_config.label_key,
+            aux_keys=("data",),
+            save_pretrained=True,
+            random_seed=seed,
+            model=model_config,
+            trainer=self.trainer_config,
+            dataset=dataset_config,
+            exp_paths=exp_paths,
+        )
+        train_command = "python -m cryovit.train_model"
+        train_command += self._create_command_from_config(
+            train_config,
+            [
+                "dataloader",
+                "cryovit_root",
+                "test_samples",
+                "split_id",
+                "logger",
+                "callbacks",
+                "losses",
+                "metrics",
+                "_target_",
+                "_partial_",
+            ],
+        )
+        # Add in additional settings
+        train_command += f" dataloader.batch_size={batch_size} 'trainer.logger=[]'"
+        # Save model config
+        self.train_model_config.model_weights = (
+            Path(exp_paths.exp_dir) / self.train_model_config.name / "weights.pt"
+        )
+        save_model_config(model_dir, self.train_model_config)
+
+        # Setup QProcesses
+        self.train_process = QProcess()
+        self.train_process.readyReadStandardOutput.connect(
+            partial(self._handle_stdout, self.train_process)
+        )
+        self.train_process.readyReadStandardError.connect(
+            partial(self._handle_stderr, self.train_process)
+        )
+        self.train_process.finished.connect(self._train_process_finish)
+
+        self.dino_process = QProcess()
+        self.dino_process.readyReadStandardOutput.connect(
+            partial(self._handle_stdout, self.dino_process)
+        )
+        self.dino_process.readyReadStandardError.connect(
+            partial(self._handle_stderr, self.dino_process)
+        )
+        self.dino_process.finished.connect(
+            partial(self._dino_process_finish, self.train_process, train_command)
+        )
+        self.log("info", f"Running DINO features:")
+        self.dino_process.start(dino_command)
+
+    def _create_command_from_config(
+        self, config: dataclass, excluded_keys: str = []
+    ) -> str:
+        """Create a command recursively from the config dataclass."""
+        for f in fields(config):
+            if f.name in excluded_keys:
+                continue
+            if isinstance(getattr(config, f.name), dataclass):
+                dino_command += " " + self._create_command_from_config(
+                    getattr(config, f.name), excluded_keys
+                )
+            elif isinstance(getattr(config, f.name), Iterable):
+                list_command = ",".join(map(str, getattr(config, f.name)))
+                dino_command += f" '{f.name}=[{list_command}]'"
+            else:
+                dino_command += f" {f.name}={getattr(config, f.name)}"
+        return dino_command
+
+    def _dino_process_finish(self, next_process: QProcess, next_command: str, *args):
+        self.log("success", "DINO features complete. Running model...")
+        self.dino_process = None
+        next_process.start(next_command)
+
+    def _segment_process_finish(self):
+        self.log("success", "Segmentation complete.")
+        self.segment_process = None
+
+    def _train_process_finish(self):
+        self.log("success", "Training complete.")
+        self.train_process = None
+
+    def _handle_stdout(self, process: QProcess):
+        data = process.readAllStandardOutput()
+        stdout = bytes(data).decode("utf-8")
+        self.log("info", stdout)
+
+    def _handle_stderr(self, process: QProcess):
+        data = process.readAllStandardError()
+        stderr = bytes(data).decode("utf-8")
+        self.log("error", stderr)
 
     def setup_console(self):
         sys.stdout = EmittingStream(textWritten=partial(self.log, "info", end=""))
@@ -775,6 +944,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sampleSelectCombo.setObjectName(old_combo.objectName())
         self.sampleSelectCombo.setToolTip(old_combo.toolTip())
         self.sampleSelectCombo.setPlaceholderText(old_combo.placeholderText())
+        self.sampleSelectCombo.addItems(samples)
         self.sampleSelectCombo.currentTextChanged.connect(
             self._update_train_model_samples
         )
@@ -792,7 +962,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Setup model cache
         self._models = {}
         # Get available models from settings
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if not model_dir:
             if not os.path.isdir(model_dir):
                 self.log(
@@ -819,7 +989,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self._models[model_name]["widget"].widget()
             )
             return
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if not model_dir:
             self.log(
                 "error",
@@ -885,16 +1055,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QFormLayout.ItemRole.FieldRole,
             QLabel(parent=contents, text=model_config.label_key),
         )
-        form_layout.setWidget(
-            4,
-            QFormLayout.ItemRole.LabelRole,
-            QLabel(parent=contents, text="Training Metrics:"),
-        )
-        form_layout.setWidget(
-            4,
-            QFormLayout.ItemRole.FieldRole,
-            QLabel(parent=contents, text=model_config.metrics),
-        )
         scroll.setWidget(contents)
         # Update cache
         self._models[model_name] = {
@@ -914,7 +1074,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             self.modelTabs.setCurrentIndex(index)
             return
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if not model_dir:
             self.log(
                 "error",
@@ -941,7 +1101,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     @_catch_exceptions("import segmentation model")
     def _import_model(self, *args):
         """Import a new model(s) from a file."""
-        model_dir = self.settings.get_setting("model/model_dir")
+        model_dir = self.settings.get_setting("model/model_directory")
         if not model_dir:
             self.log(
                 "error",
@@ -954,12 +1114,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             False,
             True,
             file_types=".pt",
+            start_dir=str(model_dir.resolve()),
         )
         for model_path in model_paths:
             # Ask user for config
             model_name = os.path.basename(model_path)
             model_config = InterfaceModelConfig(
-                model_name, "", ModelArch.CRYOVIT, {}, [], {}
+                model_name, "", ModelArch.CRYOVIT, Path(model_path), {}, []
             )
             config_dialog = ModelDialog(self, model_config)
             result = config_dialog.exec()
@@ -968,7 +1129,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 continue
             model_config = config_dialog.config
             # Save config to disk
-            save_model(model_config, model_dir, model_name)
+            save_model_config(model_dir, model_config)
             # Add model to list
             self.modelCombo.addItem(model_name)
             self.modelCombo.setCurrentText(model_name)
@@ -1122,7 +1283,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Select {name} {'directory' if is_folder else 'file'}:",
                 is_folder,
                 is_multiple,
-                start_dir=(self.settings.get_setting("general/data_dir")),
+                start_dir=(self.settings.get_setting("general/data_directory")),
             )
         )
 
@@ -1426,23 +1587,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         event.accept()
 
 
-dino_dir = Path("C:/Users/visav/Documents/Work/CryoViT/Data/DINOv2").resolve()
-data_dir = Path(
-    "C:/Users/visav/Documents/Work/CryoViT/Data/Processed Tomograms/Q66"
-).resolve()
-batch_size = 8
-dst_dir = Path("C:/Users/visav/Documents/Work/CryoViT/Data/Dino Features/Q66").resolve()
-get_dino_features(
-    dino_dir,
-    data_dir,
-    batch_size,
-    dst_dir=dst_dir,
-)
+app = QApplication(sys.argv)
+app.setStyle("Fusion")
 
-# app = QApplication(sys.argv)
-# app.setStyle("Fusion")
+window = MainWindow()
+window.show()
 
-# window = MainWindow()
-# window.show()
-
-# app.exec()
+app.exec()

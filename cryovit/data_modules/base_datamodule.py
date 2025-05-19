@@ -78,13 +78,18 @@ class BaseDataModule(LightningDataModule):
         )
         return self.dataloader_fn(dataset, shuffle=False)
 
-    def predict_dataloader(self) -> DataLoader:
-        """Creates DataLoader for prediction data.
+    def infer_dataloader(self) -> DataLoader:
+        """Creates DataLoader for inference data.
 
         Returns:
-            DataLoader: A DataLoader instance for prediction data.
+            DataLoader: A DataLoader instance for inference data.
         """
-        return self.test_dataloader()
+        dataset = TomoDataset(
+            records=self.record_df(),
+            train=False,
+            **self.dataset_params,
+        )
+        return self.dataloader_fn(dataset, shuffle=False)
 
     def train_df(self) -> pd.DataFrame:
         """Abstract method to generate train splits."""

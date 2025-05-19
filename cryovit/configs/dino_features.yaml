@@ -5,7 +5,8 @@ cryovit_root: /sdf/home/c/cathyhou/projects/test/CryoVIT
 dino_dir: /sdf/home/c/cathyhou/projects/foundation_models
 
 # Directory containing tomograms and CSV files
-data_dir: ${.cryovit_root}/data
+tomo_dir: ${.cryovit_root}/data/tomograms
+csv_dir: ${.cryovit_root}/data/csv
 
 # Destination to save the generated DINOv2 features
 feature_dir: ${data_dir}/dino_features
