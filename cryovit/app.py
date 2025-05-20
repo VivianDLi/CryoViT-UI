@@ -594,6 +594,74 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         worker.signals.error.connect(self._handle_thread_exception)
         self.threadpool.start(worker)
 
+    @_catch_exceptions("feature extraction", concurrent=True)
+    def run_feature_extraction(self, *args):
+        if self.dino_process is not None:
+            self.log(
+                "warning",
+                "Cannot run feature extraction: Another process is already running.",
+            )
+            return
+
+        dino_dir = self.settings.get_setting("dino/model_directory")
+        if dino_dir:
+            dino_dir = Path(dino_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
+            )
+            return
+        if self.dataDirectoryTrain.text():
+            data_dir = Path(self.dataDirectoryTrain.text()).resolve()
+        else:
+            self.log("warning", "No data directory specified.")
+            return
+        if self.csvDirectory.text():
+            csv_dir = Path(self.csvDirectory.text()).resolve()
+        else:
+            self.log("warning", "No CSV directory specified.")
+            return
+        if features_dir:
+            features_dir = Path(features_dir).resolve()
+        else:
+            self.log(
+                "warning",
+                f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
+            )
+            features_dir = data_dir
+        dino_batch_size = self.settings.get_setting("dino/batch_size")
+
+        # Setup DINOv2 command
+        dino_config = DinoFeaturesConfig(
+            dino_dir=dino_dir,
+            tomo_dir=data_dir,
+            csv_dir=csv_dir,
+            feature_dir=features_dir,
+            batch_size=dino_batch_size,
+            sample=self.sampleSelectCombo.getCurrentData(),
+        )
+        dino_commands = ["-m", "cryovit.dino_features"]
+        dino_commands += self._create_command_from_config(
+            dino_config, ["all_samples", "cryovit_root"]
+        )
+        dino_commands += ["hydra.mode=RUN"]
+
+        self.dino_process = QProcess()
+        self.dino_process.readyReadStandardOutput.connect(
+            partial(self._handle_stdout, "dino_process")
+        )
+        self.dino_process.readyReadStandardError.connect(
+            partial(self._handle_stderr, "dino_process")
+        )
+        self.dino_process.stateChanged.connect(
+            partial(self._handle_state_change, "dino_process")
+        )
+        self.dino_process.finished.connect(self._dino_process_finish)
+        self.log("info", f"Running DINO features:")
+        self.log("debug", f"Command: {dino_commands}")
+        self.dino_process.start("python", dino_commands)
+
     @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
         if self.dino_process is not None or self.segment_process is not None:
@@ -612,17 +680,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
             return
-        dino_dir = self.settings.get_setting("dino/model_directory")
-        if dino_dir:
-            dino_dir = Path(dino_dir).resolve()
-        else:
-            self.log(
-                "warning",
-                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
-            )
-            return
         if self.dataDirectory.text():
-            src_dir = Path(self.dataDirectory.text()).resolve()
+            data_dir = Path(self.dataDirectory.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
             return
@@ -630,7 +689,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Get directories
         replace_seg = self.replaceCheckboxSeg.isChecked()
         replace_seg_dir = self.replaceDirectorySeg
-        dst_dir = Path(replace_seg_dir.text() if replace_seg else src_dir)
+        dst_dir = Path(replace_seg_dir.text() if replace_seg else data_dir).resolve()
         features_dir = self.settings.get_setting("dino/features_directory")
         if features_dir:
             features_dir = Path(features_dir).resolve()
@@ -639,29 +698,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "warning",
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
-            features_dir = src_dir
-        dino_batch_size = self.settings.get_setting("dino/batch_size")
+            features_dir = data_dir
         batch_size = self.settings.get_setting("segmentation/batch_size")
         if self.settings.get_setting("segmentation/csv_file"):
             csv_file = self.settings.get_setting("segmentation/csv_file")
             csv_file = Path(csv_file).resolve()
         else:
             csv_file = None
-
-        # Setup DINOv2 command
-        dino_config = DinoFeaturesConfig(
-            dino_dir=dino_dir,
-            tomo_dir=src_dir.parent,
-            csv_dir=None,
-            feature_dir=features_dir,
-            batch_size=dino_batch_size,
-            sample=[src_dir.name],
-        )
-        dino_commands = ["-m", "cryovit.dino_features"]
-        dino_commands += self._create_command_from_config(
-            dino_config, ["all_samples", "cryovit_root"]
-        )
-        dino_commands += ["hydra.mode=RUN"]
 
         # Setup segmentation command
         # Get model list
@@ -699,7 +742,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         # Add in additional settings
         infer_commands += [
-            f"dataloader.batch_size={batch_size}",
+            # f"dataloader.batch_size={batch_size}",
             f"models=[{model_names}]",
             "hydra.mode=RUN",
         ]
@@ -716,23 +759,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             partial(self._handle_state_change, "segment_process")
         )
         self.segment_process.finished.connect(self._segment_process_finish)
-
-        self.dino_process = QProcess()
-        self.dino_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, "dino_process")
-        )
-        self.dino_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, "dino_process")
-        )
-        self.dino_process.stateChanged.connect(
-            partial(self._handle_state_change, "dino_process")
-        )
-        self.dino_process.finished.connect(
-            partial(self._dino_process_finish, "segment_process", infer_commands)
-        )
-        self.log("info", f"Running DINO features:")
-        self.log("debug", f"Command: {dino_commands}")
-        self.dino_process.start("python", dino_commands)
+        self.log("info", f"Running segmentation:")
+        self.log("debug", f"Command: {infer_commands}")
+        self.segment_process.start("python", infer_commands)
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
@@ -750,15 +779,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log(
                 "warning",
                 f"Missing model directory: {model_dir}. Please set it in the settings.",
-            )
-            return
-        dino_dir = self.settings.get_setting("dino/model_directory")
-        if dino_dir:
-            dino_dir = Path(dino_dir).resolve()
-        else:
-            self.log(
-                "warning",
-                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
             )
             return
         if self.dataDirectoryTrain.text():
@@ -794,24 +814,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
             features_dir = data_dir
-        dino_batch_size = self.settings.get_setting("dino/batch_size")
         batch_size = self.settings.get_setting("training/batch_size")
         seed = self.settings.get_setting("training/random_seed")
-
-        # Setup DINOv2 command
-        dino_config = DinoFeaturesConfig(
-            dino_dir=dino_dir,
-            tomo_dir=data_dir,
-            csv_dir=csv_dir,
-            feature_dir=features_dir,
-            batch_size=dino_batch_size,
-            sample=self.sampleSelectCombo.getCurrentData(),
-        )
-        dino_commands = ["-m", "cryovit.dino_features"]
-        dino_commands += self._create_command_from_config(
-            dino_config, ["all_samples", "cryovit_root"]
-        )
-        dino_commands += ["hydra.mode=RUN"]
 
         # Setup training command
         model_name, model_config = load_base_model_config(self.train_model_config)
@@ -883,24 +887,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             partial(self._handle_state_change, "train_process")
         )
         self.train_process.finished.connect(self._train_process_finish)
-
-        self.dino_process = QProcess()
-        self.dino_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, "dino_process")
-        )
-        self.dino_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, "dino_process")
-        )
-        self.dino_process.stateChanged.connect(
-            partial(self._handle_state_change, "dino_process")
-        )
-        self.dino_process.finished.connect(
-            partial(self._dino_process_finish, "train_process", train_commands)
-        )
-        self.log("info", f"Running DINO features:")
-        # self.log("debug", f"Command: {dino_commands}")
+        self.log("info", f"Running training:")
         self.log("debug", f"Command: {train_commands}")
-        # self.dino_process.start("python", dino_commands)
         self.train_process.start("python", train_commands)
 
     def _create_command_from_config(self, config, excluded_keys: str = []) -> List[str]:
@@ -929,18 +917,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 dino_commands += [f"{f.name}={getattr(config, f.name)}"]
         return dino_commands
 
-    def _dino_process_finish(self, next_process_name: str, next_command: str, *args):
+    def _dino_process_finish(self, *args):
         self.log("success", "DINO features complete. Running model...")
         self.dino_process = None
-        self.log("debug", f"Command: {next_command}")
-        getattr(self, next_process_name).start("python", next_command)
+        QGuiApplication.restoreOverrideCursor()
 
-    def _segment_process_finish(self):
+    def _segment_process_finish(self, *args):
         self.log("success", "Segmentation complete.")
         self.segment_process = None
         QGuiApplication.restoreOverrideCursor()
 
-    def _train_process_finish(self):
+    def _train_process_finish(self, *args):
         self.log("success", "Training complete.")
         self.train_process = None
         QGuiApplication.restoreOverrideCursor()
@@ -1495,6 +1482,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.chimeraButton.clicked.connect(self.run_chimerax)
         self.splitsButton.clicked.connect(self.run_generate_training_splits)
         self.splitsButtonNew.clicked.connect(self.run_new_training_splits)
+        self.featureButtonSeg.clicked.connect(self.run_feature_extraction)
+        self.featureButtonTrain.clicked.connect(self.run_feature_extraction)
+        self.segmentButton.clicked.connect(self.run_segmentation)
         self.trainButton.clicked.connect(self.run_training)
 
     def setup_menu(self):

@@ -143,7 +143,7 @@ def run_trainer(cfg: TrainModelConfig) -> None:
             PretrainedModel(
                 name=cfg.exp_name,
                 label_key=cfg.label_key,
-                model_weights=exp_paths.exp_dir / "weights.pt",
+                model_weights=str(exp_paths.exp_dir.resolve() / "weights.pt"),
                 model_type=model_type.upper(),
                 model=cfg.model,
             )
