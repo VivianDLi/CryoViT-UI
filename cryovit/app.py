@@ -7,7 +7,7 @@ from functools import partial
 from dataclasses import is_dataclass, fields
 import platform
 import traceback
-from typing import List
+from typing import List, Tuple
 from collections.abc import Iterable
 import pyperclip
 
@@ -59,14 +59,14 @@ from cryovit.processing import *
 
 
 class WorkerSignals(QObject):
-    """Signals for worker threads."""
+    """Signals for background threads to communicate with the GUI."""
 
-    finish = pyqtSignal()
-    error = pyqtSignal(tuple)
+    finish = pyqtSignal()  # signals when the thread is finished
+    error = pyqtSignal(tuple)  # signals when the thread errors
 
 
 class Worker(QRunnable):
-    """Worker thread for running tasks in the background."""
+    """Thread for running long processing tasks in the background."""
 
     def __init__(self, fn, *args, **kwargs):
         super().__init__()
@@ -76,7 +76,6 @@ class Worker(QRunnable):
         self.signals = WorkerSignals()
 
     def run(self):
-        """Run the function in the worker thread."""
         try:
             self.fn(*self.args, **self.kwargs)
         except Exception:
@@ -86,38 +85,52 @@ class Worker(QRunnable):
             self.signals.finish.emit()
 
 
-# Subclass QMainWindow to customize your application's main window
+def _catch_exceptions(desc: str, concurrent: bool = False):
+    """Decorator to catch exceptions when running any UI function.
+
+    Args:
+        desc (str): Description of the function being run.
+        concurrent (bool): Whether the function is running in a thread.
+    """
+
+    def inner(func):
+        def wrapper(self, *args, **kwargs):
+            try:
+                if (
+                    concurrent and self.threadpool.activeThreadCount() > 0
+                ):  # if another thread is running
+                    self.log(
+                        "warning"
+                        f"Cannot run {desc}: Another process is already running."
+                    )
+                func(self, *args, **kwargs)
+                if (
+                    concurrent and self.threadpool.activeThreadCount() > 0
+                ):  # set busy cursor
+                    QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+                if (
+                    self.chimera_process is not None or self.dino_process is not None
+                ):  # if external processes are running
+                    QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            except Exception as e:
+                self.log("error", f"Error running {desc}: {e}")
+
+        return wrapper
+
+    return inner
+
+
 class MainWindow(QMainWindow, Ui_MainWindow):
-    def _catch_exceptions(desc: str, concurrent: bool = False):
-        """Decorator to catch exceptions when running any function."""
+    """The main UI window for CryoViT. Handles the main application logic and UI interactions."""
 
-        def inner(func):
-            def wrapper(self, *args, **kwargs):
-                try:
-                    if (
-                        concurrent and self.threadpool.activeThreadCount() > 0
-                    ):  # if not running in a thread
-                        self.log(
-                            "warning"
-                            f"Cannot run {desc}: Another process is already running."
-                        )
-                    func(self, *args, **kwargs)
-                    if concurrent and self.threadpool.activeThreadCount() > 0:
-                        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-                    if (
-                        self.chimera_process is not None
-                        or self.dino_process is not None
-                    ):
-                        QGuiApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-                except Exception as e:
-                    self.log("error", f"Error running {desc}: {e}")
-
-            return wrapper
-
-        return inner
-
-    def _handle_thread_exception(self, info, *args):
-        """Handle exceptions in worker threads."""
+    # Signals for background and external threads and processes
+    def _handle_thread_exception(
+        self, info: Tuple[type[BaseException], BaseException, str], *args
+    ):
+        """Handle exceptions in background threads.
+        Args:
+            info (Tuple[type[BaseException], BaseException, str]): Tuple containing the exception type, value, and traceback.
+        """
         exctype, value, traceback_info = info
         self.log(
             "error",
@@ -125,7 +138,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
     def _on_thread_finish(self, name: str, *args):
-        """Handle thread finish signal and update progress bar."""
+        """Handle progress bar updates, busy cursor, and logging when a background thread finishes.
+
+        Args:
+            name (str): Name of the process that finished.
+        """
         self.progress_dict[name]["count"] += 1
         count, total = (
             self.progress_dict[name]["count"],
@@ -136,14 +153,55 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             QGuiApplication.restoreOverrideCursor()
             self.log("success", f"{name} complete.")
 
+    def _handle_stdout(self, process_name: str, *args):
+        """Handle standard output from an external QProcess.
+        Args:
+            process_name (str): Name of the process.
+        """
+        data = getattr(self, process_name).readAllStandardOutput()
+        stdout = bytes(data).decode("utf-8")
+        self.log("info", stdout, end="", use_timestamp=False)
+
+    def _handle_stderr(self, process_name: str, *args):
+        """Handle standard error from an external QProcess.
+        Args:
+            process_name (str): Name of the process.
+        """
+        data = getattr(self, process_name).readAllStandardError()
+        stderr = bytes(data).decode("utf-8")
+        self.log("error", stderr, end="", use_timestamp=False)
+
+    def _handle_state_change(
+        self, process_name: str, state: QProcess.ProcessState, *args
+    ):
+        """Handle state changes of an external QProcess.
+        Args:
+            process_name (str): Name of the process.
+            state (QProcess.ProcessState): Current state of the process.
+        """
+        match state:
+            case QProcess.ProcessState.NotRunning:
+                self.log("debug", f"{process_name} process not running.")
+            case QProcess.ProcessState.Starting:
+                self.log("debug", f"{process_name} process starting.")
+            case QProcess.ProcessState.Running:
+                self.log("debug", f"{process_name} process running.")
+            case _:
+                self.log("warning", f"{process_name} process unknown state.")
+
+    # UI initialization
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
         # Setup settings
         self.settings = SettingsWindow(self)
         # Setup thread pool and processes
-        self.threadpool: QThreadPool = QThreadPool.globalInstance()
-        self.progress_dict = {}
+        self.threadpool: QThreadPool = (
+            QThreadPool.globalInstance()
+            if QThreadPool.globalInstance()
+            else QThreadPool()
+        )
+        self.progress_dict = {}  # progress bar update dict
         self.chimera_process = None
         self.dino_process = None
         self.segment_process = None
@@ -167,6 +225,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("preprocessing", concurrent=True)
     def run_preprocessing(self, is_train: bool, *args):
+        """Background thread to bin, normalize, and clip tomograms.
+
+        Args:
+            is_train (bool): Whether to use widgets in the train tab to determine arguments.
+        """
         # Get optional kwargs from settings
         kwargs = {
             "bin_size": self.settings.get_setting("preprocessing/bin_size"),
@@ -195,11 +258,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("warning", "No replace directory specified.")
             return
 
+        # Setup thread callbacks
         finish_callback = partial(self._on_thread_finish, "Preprocessing")
         self.progress_dict["Preprocessing"] = {"count": 0, "total": 0}
         # Check for samples
         samples = self.sampleSelectCombo.getCurrentData()
         if is_train and samples:
+            # For multi-sample train pre-processing to use multithreading
             self.progress_dict["Preprocessing"]["total"] = len(samples)
             for sample in samples:
                 if not os.path.isdir(src_dir / sample):
@@ -218,6 +283,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 worker.signals.error.connect(self._handle_thread_exception)
                 self.threadpool.start(worker)
         else:
+            # Single sample train pre-processing and segmentation pre-processing are both 1 folder
             if not os.path.isdir(src_dir):
                 self.log(
                     "error",
@@ -231,6 +297,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("ChimeraX")
     def run_chimerax(self, *args):
+        """Launch ChimeraX externally to select z-limits and tomogram slices to label (and create .csv file)."""
+        # Get path to ChimeraX executable (only matters on Windows or Mac)
         chimerax_path = self.settings.get_setting("annotation/chimera_path")
         if not chimerax_path and platform.system().lower() != "linux":
             self.log(
@@ -281,6 +349,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 0, chimerax_path, src_dir, None, dst_dir, csv_dir, num_slices
             )
         else:
+            # Sequentially process each sample
             self._next_chimera_process(
                 0,
                 chimerax_path,
@@ -301,9 +370,20 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         csv_dir: Path,
         num_slices: int,
     ):
-        """Launch the next ChimeraX process."""
+        """Launches ChimeraX and sets up the next sample to launch when closed.
+
+        Args:
+            index (int): Index of the current sample.
+            chimerax_path (Path): Path to the ChimeraX executable.
+            src_dir (Path): Source directory for the tomograms.
+            samples (List[str] | None): List of samples to process. If None, processing a single directory.
+            dst_dir (Path): Destination directory for the slices.
+            csv_dir (Path): Destination directory for the CSV files.
+            num_slices (int): Number of slices to process.
+        """
         self.chimera_process = None
         if samples:
+            # Update progress bar and check for completion
             self._update_progress_bar(index + 1, len(samples))
             if index >= len(samples):
                 self.log("success", "ChimeraX processing complete.")
@@ -312,6 +392,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             sample = samples[index]
             is_dir = os.path.isdir(src_dir / sample)
         else:
+            # Check for completion
             if index >= 1:
                 self.log("success", "ChimeraX processing complete.")
                 QGuiApplication.restoreOverrideCursor()
@@ -333,6 +414,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 num_slices,
             )
             return
+        # Launch ChimeraX
         command = self._validate_chimerax_process(
             chimerax_path,
             src_dir,
@@ -341,7 +423,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             csv_dir=csv_dir,
             num_slices=num_slices,
         )
-        if command is not None:
+        if command is not None:  # No errors in command generation
             self.chimera_process = QProcess()
             self.chimera_process.readyReadStandardOutput.connect(
                 partial(self._handle_stdout, self.chimera_process)
@@ -387,6 +469,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         csv_dir: Path = None,
         num_slices: int = 5,
     ) -> str | None:
+        """Generate the start command for ChimeraX to start labeling in the clipboard and return the command to launch ChimeraX.
+
+        Args:
+            chimerax_path (Path): Path to the ChimeraX executable.
+            src_dir (Path): Source directory for the tomograms.
+            sample (str, optional): Sample name. Defaults to None (i.e., single directory).
+            dst_dir (Path, optional): Destination directory for the slices. Defaults to None.
+            csv_dir (Path, optional): Destination directory for the CSV files. Defaults to None.
+            num_slices (int, optional): Number of slices to process. Defaults to 5.
+        """
         if self.chimera_process is not None:
             return None
         # Create script args
@@ -440,6 +532,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
+        """Add annotations to tomograms and generate training splits .csv file."""
         # Get directories from settings
         samples = self.sampleSelectCombo.getCurrentData()
         if self.dataDirectoryTrain.text():
@@ -466,9 +559,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             return
 
+        # Setup thread callbacks
         finish_callback = partial(self._on_thread_finish, "Annotations")
         self.progress_dict["Annotations"] = {"count": 0, "total": 0}
-        # Check for no samples
+        # Check for no samples (single directory)
         if not samples:
             if not os.path.isdir(src_dir):
                 self.log(
@@ -502,6 +596,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             split_worker.signals.finish.connect(finish_callback)
             annotation_worker.signals.error.connect(self._handle_thread_exception)
             split_worker.signals.error.connect(self._handle_thread_exception)
+            # Run adding annotations and generating splits in parallel
             self.threadpool.start(annotation_worker)
             self.threadpool.start(split_worker)
         else:
@@ -537,11 +632,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 split_worker.signals.finish.connect(finish_callback)
                 annotation_worker.signals.error.connect(self._handle_thread_exception)
                 split_worker.signals.error.connect(self._handle_thread_exception)
+                # Run both in parallel with all samples for multithreading
                 self.threadpool.start(annotation_worker)
                 self.threadpool.start(split_worker)
 
     @_catch_exceptions("generate new training splits", concurrent=True)
     def run_new_training_splits(self, *args):
+        """Generate new training splits .csv file from existing splits."""
         # Get directory from settings
         if self.csvDirectory.text():
             csv_dir = Path(self.csvDirectory.text()).resolve()
@@ -554,6 +651,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         num_splits = self.settings.get_setting("training/number_of_splits")
         seed = self.settings.get_setting("training/random_seed")
 
+        # Get splits file or set it to default value
         splits_file = self.settings.get_setting("training/splits_file")
         if splits_file:
             splits_file = Path(splits_file).resolve()
@@ -565,6 +663,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No splits file specified in Settings. Using {splits_file}.",
             )
 
+        # Check to see if new splits replaces old splits
         dst_name, ok = QInputDialog.getText(
             self, "New Split Name", "Enter new split name:"
         )
@@ -582,6 +681,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("warning", f"No split specified. Please specify a split name.")
             return
 
+        # Start thread to generate new splits
         finish_callback = partial(self._on_thread_finish, "New Splits")
         worker = Worker(
             generate_new_splits,
@@ -596,6 +696,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
+        """Segments a tomogram folder using multiple models."""
+        # Check for existing processes
         if self.dino_process is not None or self.segment_process is not None:
             self.log(
                 "warning",
@@ -627,7 +729,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("warning", "No data directory specified.")
             return
 
-        # Get directories
+        # Get directories from settings
         replace_seg = self.replaceCheckboxSeg.isChecked()
         replace_seg_dir = self.replaceDirectorySeg
         dst_dir = Path(replace_seg_dir.text() if replace_seg else src_dir)
@@ -736,6 +838,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
+        """Train a selected model with selected training samples."""
+        # Check for existing processes
         if self.dino_process is not None or self.train_process is not None:
             self.log(
                 "warning",
@@ -909,7 +1013,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for f in fields(config):
             if f.name in excluded_keys:
                 continue
-            if is_dataclass(getattr(config, f.name)):
+            if is_dataclass(
+                getattr(config, f.name)
+            ):  # Top-level settings still need to be set later
                 dino_commands += [
                     f.name + "." + cmd
                     for cmd in self._create_command_from_config(
@@ -945,32 +1051,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.train_process = None
         QGuiApplication.restoreOverrideCursor()
 
-    def _handle_stdout(self, process_name: str):
-        data = getattr(self, process_name).readAllStandardOutput()
-        stdout = bytes(data).decode("utf-8")
-        self.log("info", stdout, end="", use_timestamp=False)
-
-    def _handle_stderr(self, process_name: str):
-        data = getattr(self, process_name).readAllStandardError()
-        stderr = bytes(data).decode("utf-8")
-        self.log("error", stderr, end="", use_timestamp=False)
-
-    def _handle_state_change(self, process_name: str, state: QProcess.ProcessState):
-        match state:
-            case QProcess.ProcessState.NotRunning:
-                self.log("debug", f"{process_name} process not running.")
-            case QProcess.ProcessState.Starting:
-                self.log("debug", f"{process_name} process starting.")
-            case QProcess.ProcessState.Running:
-                self.log("debug", f"{process_name} process running.")
-            case _:
-                self.log("warning", f"{process_name} process unknown state.")
-
     def setup_console(self):
+        """Setup the UI console to display stdout and stderr messages."""
         sys.stdout = EmittingStream(textWritten=partial(self.log, "info"))
         sys.stderr = EmittingStream(textWritten=partial(self.log, "error"))
 
     def setup_checkboxes(self):
+        """Setup replace checkboxes for selecting destination directories."""
         # Update from current checkbox state
         self._show_hide_widgets(
             not self.replaceCheckboxProc.isChecked(),
@@ -1017,12 +1104,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
 
     def setup_sample_select(self):
+        """Setup the sample select combobox for selecting training samples."""
         old_combo = self.sampleSelectCombo
         self.sampleSelectCombo = MultiSelectComboBox(parent=self.sampleSelectFrame)
         self.sampleSelectCombo.setSizePolicy(old_combo.sizePolicy())
         self.sampleSelectCombo.setObjectName(old_combo.objectName())
         self.sampleSelectCombo.setToolTip(old_combo.toolTip())
         self.sampleSelectCombo.setPlaceholderText(old_combo.placeholderText())
+        # Set initial available samples from existing enum
         self.sampleSelectCombo.addItems(samples)
         self.sampleSelectCombo.currentTextChanged.connect(
             self._update_train_model_samples
@@ -1038,6 +1127,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.sampleSelectCombo.addNewItem()
 
     def setup_model_select(self):
+        """Setup model architecture selection for training."""
         # Setup model cache
         self._models = {}
         # Get available models from settings
@@ -1221,6 +1311,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("warning", "No model file selected.")
 
     def setup_folder_selects(self):
+        """Setup tool buttons for opening folder and file select dialogs."""
         # Setup folder select buttons
         self.rawSelect.clicked.connect(
             partial(
@@ -1381,12 +1472,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("error", f"Invalid folder path: {current_text}")
 
     def setup_feature_select(self):
+        """Setup the feature selection for training."""
         self.features = []
         self.featuresAdd.clicked.connect(self._add_feature)
         self.featuresDisplay.editingFinished.connect(self._update_features)
 
     @_catch_exceptions("add training feature")
     def _add_feature(self, *args):
+        """Adds a new feature to the available training feature list."""
         feature_name, _ = QInputDialog.getText(
             self, "Add Feature", "Enter feature name:"
         )
@@ -1397,6 +1490,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("update training features")
     def _update_features(self, *args):
+        """Update the training features based on the text field."""
         current_text = self.featuresDisplay.text()
         if current_text:
             self.features = [feature.strip() for feature in current_text.split(",")]
@@ -1408,6 +1502,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.labelCombo.addItems(self.features)
 
     def setup_training_config(self):
+        """Setup creating and editing the train model and trainer configurations."""
         self.train_model = None
         self.train_model_config = None
         self.trainer_config = TrainerFit()
@@ -1429,6 +1524,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("update training model architecture")
     def _update_train_model_arch(self, text: str, *args):
+        """Update the training model architecture based on the selected model."""
         if not self.train_model_config:
             samples = self.sampleSelectCombo.getCurrentData()
             self.train_model_config = InterfaceModelConfig(
@@ -1443,6 +1539,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("update training model samples")
     def _update_train_model_samples(self, text: str, *args):
+        """Update the training model samples based on the selected samples."""
         samples = list(map(str.strip, text.split(",")))
         if not self.train_model_config:
             self.train_model_config = InterfaceModelConfig(
@@ -1457,6 +1554,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("update training model label")
     def _update_train_model_label(self, text: str, *args):
+        """Update the training model classiification label based on the selected label."""
         if not self.train_model_config:
             self.log(
                 "warning",
@@ -1467,6 +1565,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("open training config")
     def _open_train_config(self, *args):
+        """Open the training model configuration dialog."""
         if not self.train_model_config:
             self.log(
                 "warning",
@@ -1490,6 +1589,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.log("success", "Training configuration updated.")
 
     def setup_run_buttons(self):
+        """Setup the run buttons for processing and training."""
         self.processButtonSeg.clicked.connect(partial(self.run_preprocessing, False))
         self.processButtonTrain.clicked.connect(partial(self.run_preprocessing, True))
         self.chimeraButton.clicked.connect(self.run_chimerax)
@@ -1498,6 +1598,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.trainButton.clicked.connect(self.run_training)
 
     def setup_menu(self):
+        """Setup the menu bar for loading and saving presets."""
         self.actionLoad_Preset.triggered.connect(self._load_preset)
         self.actionSave_Preset.triggered.connect(partial(self._save_preset, True))
         self.actionSaveAs_Preset.triggered.connect(partial(self._save_preset, False))

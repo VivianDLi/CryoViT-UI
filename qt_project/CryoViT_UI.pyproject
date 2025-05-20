@@ -1,0 +1,12 @@
+{
+    "PY_DIRECTORY": "C:/Users/visav/Documents/Work/CryoViT/Code/CryoViT/cryovit/gui/layouts",
+    "PY_FILE": "mainwindow.py",
+    "UI_FILE": "mainwindow.ui",
+    "files": [
+        "modeldialog.ui",
+        "mainwindow.ui",
+        "presetdialog.ui",
+        "resources.qrc",
+        "settingswindow.ui"
+    ]
+}
