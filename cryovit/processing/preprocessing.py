@@ -22,6 +22,11 @@ logger.addHandler(handler)
 
 
 def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
+    """Pool tomogram data to reduce its size.
+    
+    Args:
+        data (np.ndarray): The tomogram data to be pooled.
+        bin_size (int): The size of the binning window."""
     pooler = torch.nn.AvgPool3d(kernel_size=bin_size, stride=bin_size, ceil_mode=True)
 
     # pooler expects (C, D, H, W) input and tomogram is (D, H, W)
@@ -33,6 +38,11 @@ def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
 
 
 def normalize_data(data: np.ndarray, clip: bool) -> np.ndarray:
+    """Normalize tomogram data and optionally clip values to +/- 3 std devs.
+    
+    Args:
+        data (np.ndarray): The tomogram data to be normalized.
+        clip (bool): Whether to clip the normalized values to +/- 3 std devs."""
     # normalize the tomogram to the range [-1, 1]
     data = (data - np.mean(data)) / np.std(data)
     if clip:

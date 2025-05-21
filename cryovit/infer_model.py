@@ -1,4 +1,4 @@
-"""Script to train segmentation models for CryoET data."""
+"""Script to infer with segmentation models for CryoET data."""
 
 import logging
 import sys

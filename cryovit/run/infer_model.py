@@ -1,4 +1,4 @@
-"""Script for setting up and training CryoVIT models based on configuration files."""
+"""Script for segmenting with pre-trained models based on configuration files."""
 
 import logging
 import os
@@ -96,10 +96,10 @@ def build_datamodules(cfg: InferModelConfig) -> List[LightningDataModule]:
 
 
 def run_trainer(cfg: InferModelConfig) -> None:
-    """Sets up and runs the training process using the specified configuration.
+    """Sets up and runs the inference process using the specified configuration.
 
     Args:
-        cfg (TrainModelConfig): Configuration object containing all settings for the training process.
+        cfg (TrainModelConfig): Configuration object containing all settings for the inference process.
     """
     datamodules = build_datamodules(cfg)
     pred_writers = [
@@ -118,6 +118,7 @@ def run_trainer(cfg: InferModelConfig) -> None:
         # Load the model weights
         model.load_state_dict(torch.load(model_config.model_weights))
 
+        # Add tomogram writer callback
         if cfg.trainer.callbacks is None:
             cfg.trainer.callbacks = []
         cfg.trainer.callbacks.append(pred_writer)

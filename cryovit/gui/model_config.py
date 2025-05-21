@@ -41,6 +41,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         self.update_UI(self.config, self.trainer_config)
 
     def add_param(self):
+        """Open a dialog to override a model parameter of a specific type."""
         name, ok = QInputDialog.getText(
             self,
             "Add Parameter",
@@ -70,16 +71,19 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         self._add_param(name, value)
 
     def add_params(self, params: Dict[str, Union[str, int, float]]):
+        """Add multiple parameters from an existing config."""
         for name, value in params.items():
             self._add_param(name, value)
 
     def _add_param(self, name: str, value: Union[str, int, float]):
+        """Add parameters to internal parameter dictionary and update the UI with new widgets."""
         self.param_dict.append({"name": name, "value": value})
         index = len(self.param_dict) - 1
         param_name = QLineEdit(name)
         param_name.editingFinished.connect(
             lambda: self.param_dict[index].update({"name": param_name.text()})
         )
+        # Create new widget based on parameter type
         match type(value).__qualname__:
             case str.__qualname__:
                 param_value = QLineEdit(str(value))
@@ -117,6 +121,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         )
 
     def remove_param(self):
+        """Opens a dialog to specify a model parameter to remove."""
         name, ok = QInputDialog.getText(
             self,
             "Remove Parameter",
@@ -134,6 +139,7 @@ class ModelDialog(QDialog, Ui_ModelDialog):
             delattr(self, f"paramValue_{index}")
 
     def validate_config(self):
+        """Validates and saves existing UI widget values to the model and trainer config dataclasses."""
         try:
             self.config.name = self.nameDisplay.text()
             self.label_key = self.labelDisplay.text()
@@ -166,7 +172,12 @@ class ModelDialog(QDialog, Ui_ModelDialog):
         model_config: InterfaceModelConfig,
         trainer_config: Union[TrainerFit, None],
     ):
-        """Update the UI with the new model configuration."""
+        """Update the UI with the new model configuration.
+
+        Args:
+            model_config (InterfaceModelConfig): the existing model configuration.
+            trainer_config (Union[TrainerFit, None]): the existing trainer configuration. If None, only shows model config.
+        """
         self.config = model_config
         self.trainer_config = trainer_config
         self.nameDisplay.setText(self.config.name)

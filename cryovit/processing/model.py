@@ -2,7 +2,6 @@
 
 import sys
 from pathlib import Path
-from dataclasses import fields
 import json
 from typing import Any, List, Tuple
 import logging
@@ -64,14 +63,14 @@ def get_available_models(model_dir: Path) -> List[str]:
 def get_model_configs(
     model_dir: Path, model_names: List[str]
 ) -> List[InterfaceModelConfig]:
-    """Get model information for a list of model names.
+    """Get model information for the UI for a list of model names.
 
     Args:
         model_dir (Path): Directory containing the model configuration files.
         model_names (List[str]): List of model names to retrieve configurations for.
 
     Returns:
-        List[InterfaceModelConfig]: List of model configurations for the specified model names.
+        List[InterfaceModelConfig]: List of model UI configurations for the specified model names.
     """
     configs = []
     for model_name in model_names:
@@ -86,7 +85,8 @@ def get_model_configs(
     return configs
 
 
-def save_model_config(model_dir: Path, model_config: InterfaceModelConfig) -> None:
+def save_model_config(model_dir: Path, model_config: InterfaceModelConfig):
+    """Save a model UI configuration to disk as a JSON file."""
     model_name = model_config.name
     # Check if the model directory exists, if not create it
     config_dir = model_dir / model_name
@@ -96,13 +96,15 @@ def save_model_config(model_dir: Path, model_config: InterfaceModelConfig) -> No
 
 
 def load_base_model_config(model_config: InterfaceModelConfig) -> Tuple[str, Model]:
-    """Load a base model based on the provided configuration.
+    """Load a base model for training based on the provided configuration.
 
     Args:
         model_config (InterfaceModelConfig): The model configuration.
 
     Returns:
-        BaseModel: The loaded model.
+        Tuple[str, Model]: A tuple containing:
+            - str: The name of the model.
+            - Model: The loaded model.
     """
     match model_config.model_type:
         case ModelArch.CRYOVIT:

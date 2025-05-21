@@ -93,6 +93,7 @@ class MultiSelectComboBox(QComboBox):
         return False
 
     def updateText(self) -> None:
+        """Update the displayed text in the combo box to display the selected items separated by commas."""
         texts = self.getCurrentData()
         if texts:
             text = ", ".join(texts)
@@ -105,7 +106,10 @@ class MultiSelectComboBox(QComboBox):
             self.lineEdit().setText("")
 
     def addItem(self, text: str) -> None:
-        """Add an item to the combo box."""
+        """Add an item to the combo box.
+
+        Args:
+            text (str): The string to add."""
         item = QStandardItem(text)
         item.setText(text)
         item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
@@ -113,7 +117,10 @@ class MultiSelectComboBox(QComboBox):
         self.model().appendRow(item)
 
     def addItems(self, texts: List[str]) -> None:
-        """Add multiple items to the combo box."""
+        """Add multiple items to the combo box.
+
+        Args:
+            texts (list): A list of strings to add."""
         for text in texts:
             self.addItem(text)
 
@@ -188,6 +195,7 @@ class MultiSelectComboBox(QComboBox):
         self.startTimer(100)  # add cooldown to prevent double open and spam
 
     def timerEvent(self, event) -> None:
+        """Timer event handler to close the popup menu without re-opening it."""
         self.killTimer(event.timerId())
         self.popupOpened = False
 
@@ -200,6 +208,19 @@ def select_file_folder_dialog(
     file_types: Union[str, List[str]] = [],
     start_dir: str = "",
 ) -> Union[str, List[str]]:
+    """Opens a file/folder selection dialog and returns the selected path(s).
+
+    Args:
+        parent (_type_): Parent Qt widget for the dialog.
+        title (str): Title for the dialog window.
+        is_folder (bool): Whether to select folders (True) or files (False).
+        is_multiple (bool, optional): Enables multiple files/folders to be selected. Defaults to False.
+        file_types (Union[str, List[str]], optional): Optionally filters available files to those with specified extensions. Defaults to [].
+        start_dir (str, optional): Directory to start the selection from. Defaults to "".
+
+    Returns:
+        Union[str, List[str]]: Paths to the selected files/folders.
+    """
     dialog = QFileDialog(parent, caption=title)
     dialog.setFileMode(
         QFileDialog.FileMode.Directory

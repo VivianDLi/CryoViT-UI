@@ -107,7 +107,7 @@ class UNet3D(Model):
 
 @dataclass
 class PretrainedModel:
-    """Configuration for managing pretrained models in CryoVIT experiments.
+    """Configuration for managing and loading pretrained models in CryoVIT experiments.
 
     Attributes:
         name (str): Name of the pretrained model, must be unique for each configuration.

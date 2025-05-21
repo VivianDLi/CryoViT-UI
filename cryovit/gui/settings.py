@@ -1,4 +1,4 @@
-"""Subwindow for viewing and editing current settings (e.g., file/folder locations, DINOv2 feature settings)."""
+"""Classes for viewing, editing, saving, and loading UI settings."""
 
 import dataclasses
 from typing import List, cast
@@ -25,6 +25,8 @@ from cryovit.gui.layouts.presetdialog import Ui_Dialog
 
 
 class PresetDialog(QDialog, Ui_Dialog):
+    """A dialog for adding, removing, saving, and loading presets."""
+
     def __init__(
         self,
         parent,
@@ -33,6 +35,15 @@ class PresetDialog(QDialog, Ui_Dialog):
         current_preset: str = None,
         load_preset: bool = False,
     ):
+        """Initialize the PresetDialog.
+
+        Args:
+            parent: The parent Qt widget of the dialog.
+            title: The title of the dialog window.
+            *presets: The list of available presets loaded from existing settings.
+            current_preset (str, optional): The current preset to select. Defaults to None.
+            load_preset (bool, optional): Whether to load the selected preset (True) or save it (False). Defaults to False.
+        """
         super().__init__(parent)
         self.setupUi(self)
         self.setWindowTitle(title)
@@ -56,6 +67,7 @@ class PresetDialog(QDialog, Ui_Dialog):
         self.presetName.returnPressed.disconnect(self._remove_preset)
         self.presetAdd.clicked.connect(self._add_preset)
         self.presetRemove.clicked.connect(self._remove_preset)
+        # Remove the ability to add new presents if loading a preset
         if load_preset:
             self.presetName.returnPressed.disconnect(self._add_preset)
             self.presetName.returnPressed.connect(self._remove_preset)
@@ -130,13 +142,12 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         super().__init__(parent)
         self.setupUi(self)
         self.setWindowTitle("Settings")
-        # Disable using 'Enter' to close the dialog
         # Load settings
         settings = QSettings("Stanford University_Wah Chiu", "CryoViT")
         self.settings = Settings()
         for key in settings.allKeys():
             self.set_setting(key, settings.value(key))
-
+        # Create the settings UI dynamically from the dataclass
         self.createSettingsUI(self.settings, self)
 
     def createSettingsUI(
@@ -145,10 +156,12 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         parent_widget: QGroupBox | QScrollArea,
         parent_name: str = None,
     ):
+        """Recursively create settings Qt widgets from Settings dataclasses."""
         for field in dataclasses.fields(parent):
+            # Save widgets as variables to prevent garbage collection
             variable_name = (
                 parent_name + "__" + field.name if parent_name else field.name
-            )  # double underscore to avoid replacing parts of the name
+            )  # double underscore to avoid replacing parts of the name later
             if isinstance(getattr(parent, field.name), BaseSetting):
                 # Create a group box for the field with a vertical layout and initial form layout
                 group_box = QGroupBox(
@@ -183,7 +196,7 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                     getattr(parent, field.name), group_box, variable_name
                 )
                 continue
-            # Get the parent form layout (no form layout for self)
+            # Get the parent form layout (skipping the first level)
             if parent_name is None:
                 continue
             parent_form: QFormLayout = parent_widget.findChild(
@@ -194,6 +207,7 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                 parent=parent_widget,
                 text=" ".join(map(str.capitalize, field.name.split("_"))) + ":",
             )
+            # Create value widget based on the field type
             match field.type.__qualname__:
                 case str.__qualname__:
                     data = QLineEdit(
@@ -250,7 +264,11 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         self.settings.set_setting(key, value)
 
     def save_settings(self, key: str = None):
-        """Save the settings to the QSettings object. If a key is specified, only that setting is saved."""
+        """Save the settings to the QSettings object. If a key is specified, only that setting is saved.
+
+        Args:
+            key (str, optional): The key to save. If None, all settings are saved. Defaults to None.
+        """
         settings = QSettings("Stanford University_Wah Chiu", "CryoViT")
         if key:
             settings.setValue(key, self.settings.get_setting(key))
@@ -259,12 +277,19 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                 settings.setValue(field, self.settings.get_setting(field))
 
     def validate_settings(self, parent: "BaseSetting", parent_name: str = None):
+        """Recursively validate and save settings inputted in the UI to the settings object.
+
+        Args:
+            parent (BaseSetting): The parent settings dataclass to validate to.
+            parent_name (str, optional): The name of the parent settings object. Defaults to None to signify the base settings class.
+        """
         try:
             for field in dataclasses.fields(parent):
                 variable_name = (
                     parent_name + "__" + field.name if parent_name else field.name
                 )
                 if isinstance(getattr(parent, field.name), BaseSetting):
+                    # Recursively validate settings for the settings group
                     self.validate_settings(getattr(parent, field.name), variable_name)
                     continue
                 # Get values from the UI and add to settings
@@ -300,7 +325,7 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
             return False
 
     def update_UI(self, parent: "BaseSetting", parent_name: str = None):
-        """Update the UI with the current settings."""
+        """Recursively update the UI with the current settings."""
         try:
             for field in dataclasses.fields(parent):
                 variable_name = (
@@ -359,6 +384,8 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
 
 @dataclasses.dataclass
 class BaseSetting:
+    """Base dataclass for storing settings."""
+
     def get_available_settings(self) -> List[str]:
         """Get a list of available settings."""
         results = []
@@ -388,7 +415,7 @@ class BaseSetting:
         return result
 
     def set_setting(self, key: str, value) -> None:
-        """Set a setting in the settings data."""
+        """Set a setting in the settings data, reading the key like a path."""
         paths = key.split("/")
         if len(paths) == 1:
             setattr(self, paths[0], value)
@@ -423,11 +450,15 @@ class PreprocessingSettings(BaseSetting):
 
 @dataclasses.dataclass
 class ModelSettings(BaseSetting):
+    """Dataclass to hold model settings."""
+
     model_directory: str = ""
 
 
 @dataclasses.dataclass
 class DinoSettings(BaseSetting):
+    """Dataclass to hold DINO settings."""
+
     model_directory: str = ""
     features_directory: str = ""
     batch_size: int = 128
@@ -435,18 +466,24 @@ class DinoSettings(BaseSetting):
 
 @dataclasses.dataclass
 class SegmentationSettings(BaseSetting):
+    """Dataclass to hold segmentation settings."""
+
     batch_size: int = 1
     csv_file: str = ""
 
 
 @dataclasses.dataclass
 class AnnotationSettings(BaseSetting):
+    """Dataclass to hold annotation settings."""
+
     chimera_path: str = ""
     num_slices: int = 5
 
 
 @dataclasses.dataclass
 class TrainingSettings(BaseSetting):
+    """Dataclass to hold training settings."""
+
     splits_file: str = ""
     number_of_splits: int = 10
     batch_size: int = 1
