@@ -32,13 +32,13 @@ class InterfaceEncoder(json.JSONEncoder):
         return obj.to_json()
 
 
-def as_config(dct: dict) -> InterfaceModelConfig:
+def as_config(json_dct: dict) -> InterfaceModelConfig:
     """Convert dictionary to InterfaceModelConfig."""
     kwargs = {}
-    for key, value in dct.items():
+    for key, value in json_dct.items():
         match key:
             case "model_type":
-                kwargs[key] = ModelArch[value["__enum__"]]
+                kwargs[key] = ModelArch[value]
             case "model_params":
                 kwargs[key] = {k: v for k, v in value.items()}
             case "model_weights":
@@ -57,7 +57,7 @@ def get_available_models(model_dir: Path) -> List[str]:
     Returns:
         List[str]: List of model names (without file extension) found in the directory.
     """
-    return [f.parent for f in model_dir.glob("*/config.json") if f.is_file()]
+    return [str(f.parent.name) for f in model_dir.glob("**/config.json") if f.is_file()]
 
 
 def get_model_configs(
@@ -75,12 +75,13 @@ def get_model_configs(
     configs = []
     for model_name in model_names:
         # Check if the model directory exists
-        model_path = model_dir / model_name
+        model_path = model_dir / model_name / "config.json"
         if not model_path.exists():
-            logger.error(f"Model directory {model_path} does not exist.")
+            logger.error(f"Model config {model_path} does not exist.")
             continue
-        with open(model_dir / model_name / "config.json", "r") as f:
-            model_config = InterfaceModelConfig(**json.load(f, object_hook=as_config))
+        with open(model_path, "r") as f:
+            config_dict = json.load(f)
+            model_config = as_config(config_dict)
         configs.append(model_config)
     return configs
 

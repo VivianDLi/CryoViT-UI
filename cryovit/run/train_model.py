@@ -148,11 +148,13 @@ def run_trainer(cfg: TrainModelConfig) -> None:
                 model=cfg.model,
             )
         )
+        # Save as list config
+        list_conf = OmegaConf.create([conf])
         search_paths = HydraConfig.get().runtime.config_sources
         config_dir = [
             path["path"] for path in search_paths if path["provider"] == "main"
         ][0]
         config_path = Path(config_dir) / "models" / f"{cfg.exp_name}.yaml"
         config_path.parent.mkdir(parents=True, exist_ok=True)
-        OmegaConf.save(conf, config_path)
+        OmegaConf.save(list_conf, config_path)
     wandb.finish(quiet=True)

@@ -6,10 +6,10 @@ from pathlib import Path
 from typing import Any, List, Optional
 
 import h5py
+import numpy as np
 import torch
 from hydra.utils import instantiate
-from pytorch_lightning.callbacks import BasePredictionWriter
-from pytorch_lightning import LightningDataModule
+from pytorch_lightning import Callback, LightningDataModule
 from pytorch_lightning import LightningModule
 from pytorch_lightning import Trainer
 
@@ -20,20 +20,25 @@ logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
 logging.getLogger("torch._inductor").setLevel(logging.WARNING)
 
 
-class TomoPredictionWriter(BasePredictionWriter):
+class TomoPredictionWriter(Callback):
     """Callback to add label predictions to tomograms."""
 
     def __init__(self, results_dir: Path, label_key: str) -> None:
+        """Creates a callback to save predictions on the test data.
+
+        Args:
+            results_dir (Path): Directory in which the predictions should be saved.
+            label_key (str): Key for the label in the dataset.
+        """
         self.results_dir = results_dir
         self.label_key = label_key
         os.makedirs(self.results_dir, exist_ok=True)
 
-    def write_on_batch_end(
+    def on_predict_batch_end(
         self,
         trainer: Trainer,
         pl_module: LightningModule,
-        prediction: torch.Tensor,
-        batch_indices: Optional[List[int]],
+        outputs: torch.Tensor,
         batch: Any,
         batch_idx: int,
         dataloader_idx: int = 0,
@@ -43,21 +48,22 @@ class TomoPredictionWriter(BasePredictionWriter):
         Args:
             trainer (Trainer): The PyTorch Lightning trainer instance.
             pl_module (BaseModel): The model instance.
-            prediction (torch.Tensor): Predictions from the model.
-            batch_indices (Optional[List[int]]): Indices of the batch.
+            outputs (torch.Tensor): Predictions from the model.
             batch (Any): The batch of data.
             batch_idx (int): Index of the current batch.
             dataloader_idx (int, optional): Index of the dataloader. Defaults to 0.
         """
+        data = batch["data"].cpu().numpy()
+        preds = outputs.cpu().numpy().astype(np.float32)
         # Save predictions to disk
-        with h5py.File(self.results_dir / batch["tomo_name"], "w+") as fh:
+        with h5py.File(self.results_dir / batch["tomo_name"], "a") as fh:
             if "data" in fh:
                 del fh["data"]
-            fh.create_dataset("data", data=batch["data"])
+            fh.create_dataset("data", data=data)
             pred_key = "predictions/" + self.label_key
             if pred_key in fh:
                 del fh[pred_key]
-            fh.create_dataset(pred_key, data=prediction, compression="gzip")
+            fh.create_dataset(pred_key, data=preds, compression="gzip")
 
 
 def build_datamodules(cfg: InferModelConfig) -> List[LightningDataModule]:
@@ -73,7 +79,7 @@ def build_datamodules(cfg: InferModelConfig) -> List[LightningDataModule]:
     dataloaders = []
     for model_config in cfg.models:
         match model_config.model_type:
-            case ModelArch.CRYOVIT:
+            case "CRYOVIT":
                 input_key = "dino_features"
             case _:
                 input_key = "data"
@@ -106,7 +112,6 @@ def run_trainer(cfg: InferModelConfig) -> None:
         TomoPredictionWriter(
             cfg.exp_paths.exp_dir,
             m_cfg.name + "_" + m_cfg.label_key,
-            write_interval="batch",
         )
         for m_cfg in cfg.models
     ]
@@ -119,9 +124,7 @@ def run_trainer(cfg: InferModelConfig) -> None:
         model.load_state_dict(torch.load(model_config.model_weights))
 
         # Add tomogram writer callback
-        if cfg.trainer.callbacks is None:
-            cfg.trainer.callbacks = []
-        cfg.trainer.callbacks.append(pred_writer)
         trainer = instantiate(cfg.trainer)
+        trainer.callbacks.append(pred_writer)
 
         trainer.predict(model, datamodule, return_predictions=False)

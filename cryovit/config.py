@@ -116,7 +116,6 @@ class PretrainedModel:
         model_weights (Path): Directory containing the pretrained model weights.
         model_type (ModelArch): Architecture type of the pretrained model.
         model (Model): The pretrained model configuration.
-        _partial_ (bool): Flag to indicate this is a partial configuration.
     """
 
     name: str = MISSING
@@ -292,7 +291,7 @@ class ExpPaths:
 
     exp_dir: Path
     tomo_dir: Path
-    split_file: Path
+    split_file: Path | None
     cryovit_root: Optional[Path] = None
 
 
@@ -380,9 +379,8 @@ class InferModelConfig:
     """Configuration for inferring using model(s) for CryoViT use.
 
     Attributes:
-        label_keys (Tuple[str]): Keys used to specify the training labels of models.
-        model_weights (Tuple[Path]): Paths to the model weights for pre-trained models.
-        models (Tuple[Modle]): The model configurations to be used for inference.
+        aux_keys (Tuple[str]): Additional keys to load auxiliary data from tomograms.
+        models (List[PretrainedModel]): The model configurations to be used for inference.
         trainer (TrainerInfer): Trainer configuration specifically designed for inference sessions.
         dataset (Dataset): Dataset configuration intended for model inference.
         exp_paths (ExpPaths): Configuration paths relevant to the experiment.
@@ -391,7 +389,7 @@ class InferModelConfig:
 
     aux_keys: Tuple[str] = ("data",)
 
-    models: Tuple[PretrainedModel] = MISSING
+    models: List[PretrainedModel] = MISSING
     trainer: TrainerInfer = MISSING
     dataset: Dataset = MISSING
     exp_paths: ExpPaths = MISSING

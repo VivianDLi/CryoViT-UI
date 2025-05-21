@@ -8,7 +8,6 @@ from dataclasses import is_dataclass, fields
 import platform
 import traceback
 from typing import List, Tuple
-from collections.abc import Iterable
 import pyperclip
 
 from PyQt6.QtWidgets import (
@@ -48,13 +47,14 @@ from cryovit.config import (
 )
 import cryovit.gui.resources
 from cryovit.gui.layouts.mainwindow import Ui_MainWindow
-from cryovit.gui.model_config import ModelDialog, TrainerFit
+from cryovit.gui.model_config import ModelDialog
 from cryovit.gui.settings import PresetDialog, SettingsWindow
 from cryovit.gui.utils import (
     EmittingStream,
     MultiSelectComboBox,
     select_file_folder_dialog,
 )
+from cryovit.config import TrainerFit, TrainerInfer
 from cryovit.processing import *
 
 
@@ -696,13 +696,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     @_catch_exceptions("feature extraction", concurrent=True)
     def run_feature_extraction(self, *args):
+        """Calculate DINO features for tomograms."""
+        # Check for existing processes
         if self.dino_process is not None:
             self.log(
                 "warning",
                 "Cannot run feature extraction: Another process is already running.",
             )
             return
-
+        # Get directories from settings
         dino_dir = self.settings.get_setting("dino/model_directory")
         if dino_dir:
             dino_dir = Path(dino_dir).resolve()
@@ -747,6 +749,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         dino_commands += ["hydra.mode=RUN"]
 
+        # Setup QProcesses
         self.dino_process = QProcess()
         self.dino_process.readyReadStandardOutput.connect(
             partial(self._handle_stdout, "dino_process")
@@ -790,8 +793,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Get directories from settings
         replace_seg = self.replaceCheckboxSeg.isChecked()
-        replace_seg_dir = self.replaceDirectorySeg
-        dst_dir = Path(replace_seg_dir.text() if replace_seg else data_dir).resolve()
+        replace_seg_dir = self.replaceDirectorySeg.text()
+        dst_dir = Path(data_dir if replace_seg else replace_seg_dir).resolve()
         features_dir = self.settings.get_setting("dino/features_directory")
         if features_dir:
             features_dir = Path(features_dir).resolve()
@@ -823,15 +826,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         dataset_config = Inference()
         infer_config = InferModelConfig(
             models=[],
-            trainer=self.trainer_config,
+            trainer=TrainerInfer(),
             dataset=dataset_config,
             exp_paths=exp_paths,
         )
         infer_commands = ["-m", "cryovit.infer_model"]
+        infer_commands += ["dataset=inference"]
         infer_commands += self._create_command_from_config(
             infer_config,
             [
+                "aux_keys",
                 "dataloader",
+                "trainer",
                 "cryovit_root",
                 "logger",
                 "callbacks",
@@ -949,7 +955,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         train_commands += [
             f"model={model_name}",
             f"dataset={dataset_name}",
-            "trainer=trainer_fit",
         ]
         train_commands += self._create_command_from_config(
             train_config,
@@ -1119,17 +1124,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self._models = {}
         # Get available models from settings
         model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
-            if not os.path.isdir(model_dir):
-                self.log(
-                    "error",
-                    f"Invalid model directory: {model_dir}. Please set it in the settings.",
-                )
-                return
-            available_models = get_available_models(Path(model_dir))
-            self.modelCombo.addItems(available_models)
-            self.modelCombo.currentIndexChanged.connect(self._update_current_model_info)
-            self.modelCombo.setCurrentIndex(0)
+        if not model_dir or not os.path.isdir(model_dir):
+            self.log(
+                "error",
+                f"Invalid model directory: {model_dir}. Please set it in the settings.",
+            )
+            return
+        available_models = get_available_models(Path(model_dir))
+        self.modelCombo.addItems(available_models)
+        self.modelCombo.currentIndexChanged.connect(self._update_current_model_info)
+        self.modelCombo.setCurrentIndex(0)
         # Setup model buttons
         self.addModelButton.clicked.connect(self._add_model)
         self.removeModelButton.clicked.connect(self._remove_model)
@@ -1146,7 +1150,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             return
         model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
+        if model_dir:
+            model_dir = Path(model_dir).resolve()
+        else:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1182,7 +1188,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         form_layout.setWidget(
             1,
             QFormLayout.ItemRole.FieldRole,
-            QLabel(parent=contents, text=model_config.architecture.value),
+            QLabel(parent=contents, text=model_config.model_type.value),
         )
         form_layout.setWidget(
             2,
@@ -1217,6 +1223,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "widget": scroll,
             "config": model_config,
         }
+        # Add scroll to self
+        setattr(self, f"{model_name}Contents", contents)
+        setattr(self, f"{model_name}Scroll", scroll)
         return scroll
 
     @_catch_exceptions("add segmentation model")
@@ -1231,7 +1240,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.modelTabs.setCurrentIndex(index)
             return
         model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
+        if model_dir:
+            model_dir = Path(model_dir).resolve()
+        else:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1258,7 +1269,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _import_model(self, *args):
         """Import a new model(s) from a file."""
         model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
+        if model_dir:
+            model_dir = Path(model_dir).resolve()
+        else:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1269,9 +1282,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select model file(s):",
             False,
             True,
-            file_types=".pt",
-            start_dir=str(model_dir.resolve()),
+            file_types=[".pt", ".pth"],
+            start_dir=str(model_dir),
         )
+        # Check for empty selection
+        if not model_paths:
+            return
         for model_path in model_paths:
             # Ask user for config
             model_name = os.path.basename(model_path)
