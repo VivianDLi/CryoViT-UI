@@ -146,7 +146,8 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         settings = QSettings("Stanford University_Wah Chiu", "CryoViT")
         self.settings = Settings()
         for key in settings.allKeys():
-            self.set_setting(key, settings.value(key))
+            if key in [f.name for f in dataclasses.fields(self.settings)]:
+                self.set_setting(key, settings.value(key))
         # Create the settings UI dynamically from the dataclass
         self.createSettingsUI(self.settings, self)
 

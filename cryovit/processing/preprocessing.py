@@ -27,12 +27,11 @@ def pool(data: np.ndarray, bin_size: int) -> np.ndarray:
     Args:
         data (np.ndarray): The tomogram data to be pooled.
         bin_size (int): The size of the binning window."""
-    pooler = torch.nn.AvgPool3d(kernel_size=bin_size, stride=bin_size, ceil_mode=True)
+    pooler = torch.nn.AvgPool1d(kernel_size=bin_size, stride=bin_size, ceil_mode=True)
 
-    # pooler expects (C, D, H, W) input and tomogram is (D, H, W)
-    data = torch.Tensor(np.expand_dims(data, axis=0))
-    # pool
-    data = pooler(data).squeeze().numpy()
+    # pooler works on last dimension and tomogram is (D, H, W)
+    data = torch.Tensor(data).permute(1, 2, 0)  # (D, H, W) => (H, W, D)
+    data = pooler(data).permute(2, 0, 1).numpy()  # (H, W, D) => (D, H, W)
 
     return data
 
