@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import shutil
 import sys
 from functools import partial
 from dataclasses import is_dataclass, fields
@@ -42,6 +43,7 @@ from cryovit.config import (
     InferModelConfig,
     InterfaceModelConfig,
     ModelArch,
+    tomogram_exts,
     samples,
     models,
 )
@@ -1608,8 +1610,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionLoad_Preset.triggered.connect(self._load_preset)
         self.actionSave_Preset.triggered.connect(partial(self._save_preset, True))
         self.actionSaveAs_Preset.triggered.connect(partial(self._save_preset, False))
-
         self.actionSettings.triggered.connect(self._open_settings)
+
+        self.actionDirectory_Setup.triggered.connect(self._setup_directory)
+
         self.actionGithub.triggered.connect(
             lambda: QDesktopServices.openUrl(
                 QUrl("https://github.com/VivianDLi/CryoViT")
@@ -1729,6 +1733,74 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if result == self.settings.DialogCode.Accepted:
             self.setup_model_select()
             self.log("success", "Settings saved.")
+
+    @_catch_exceptions("setup directory")
+    def _setup_directory(self, *args):
+        """Open file dialogs to setup a data directory for downloaded datasets."""
+        # Get the directory where datasets are downloaded
+        src_dir = select_file_folder_dialog(
+            self, "Select downloaded dataset base directory:", True, False
+        )
+        if not src_dir or not os.path.isdir(src_dir):
+            self.log("warning", "No valid directory selected.")
+            return
+        src_dir = Path(src_dir).resolve()
+        search_query, ok = QInputDialog.getText(
+            self,
+            "Dataset Search Query",
+            "Enter the search query for finding tomograms in the downloaded dataset:\n\n"
+            + "Note: This is a regex string, where '**' matches to any combination of directories and '*' matches to immediate children\n"
+            + "(e.g., '**/Tomograms/**/*' finds all files inside any child of a folder named 'Tomograms' anywhere in the base directory,\n"
+            + "and '**/Tomograms/*' only finds the files inside the folder named 'Tomograms').\n"
+            + f"Only files with extensions in {tomogram_exts} will be moved to the new directory.",
+            text="**/Tomograms/**/*",
+        )
+        if not ok or not search_query:
+            self.log(
+                "warning", "No search query specified. Defaulting to '**/Tomograms/**'."
+            )
+            search_query = "**/Tomograms/**/*"
+        # Get the tomogram files to move
+        tomogram_files = get_all_tomogram_files(src_dir, search_query)
+        continue_moving = QMessageBox.question(
+            self,
+            "Move Files?",
+            f"Found {len(tomogram_files)} tomograms. Do you want to move them?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            defaultButton=QMessageBox.StandardButton.Yes,
+        )
+        if continue_moving == QMessageBox.StandardButton.No:
+            return
+
+        # Get the directory where raw tomograms are stored
+        data_dir = select_file_folder_dialog(
+            self, "Select raw tomogram base directory:", True, False
+        )
+        if not data_dir or not os.path.isdir(data_dir):
+            self.log("warning", "No valid directory selected.")
+            return
+        data_dir = Path(data_dir).resolve()
+        sample_name, ok = QInputDialog.getText(
+            self, "Dataset Sample Name", "Enter sample name for the downloaded dataset:"
+        )
+        if not ok or not sample_name:
+            self.log("warning", "No sample name specified.")
+            return
+        delete_dir = QMessageBox.question(
+            self,
+            "Delete Directory?",
+            "Do you want to delete the existing directory?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            defaultButton=QMessageBox.StandardButton.No,
+        )
+        # Create the dataset structure
+        self.log("info", f"Moving {len(tomogram_files)} tomograms from {src_dir}.")
+        create_dataset(tomogram_files, data_dir, sample_name)
+        self.log("success", f"Dataset structure created at {data_dir / sample_name}.")
+        # Clean up the source directory if requested
+        if delete_dir == QMessageBox.StandardButton.Yes:
+            shutil.rmtree(src_dir)
+            self.log("success", f"Deleted {src_dir}.")
 
     def _show_hide_widgets(self, visible: bool, *widgets):
         """Show or hide multiple widgets."""

@@ -12,6 +12,7 @@ from cryovit.processing.model import (
     save_model_config,
     load_base_model_config,
 )
+from cryovit.processing.dataset import get_all_tomogram_files, create_dataset
 
 chimera_script_path = __file__.replace("__init__.py", "chimera_slices.py")
 
@@ -24,5 +25,7 @@ __all__ = [
     "get_model_configs",
     "save_model_config",
     "load_base_model_config",
+    "get_all_tomogram_files",
+    "create_dataset",
     "chimera_script_path",
 ]
