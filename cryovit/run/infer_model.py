@@ -54,7 +54,8 @@ class TomoPredictionWriter(Callback):
             dataloader_idx (int, optional): Index of the dataloader. Defaults to 0.
         """
         data = batch["data"].cpu().numpy()
-        preds = outputs.cpu().numpy().astype(np.float32)
+        outputs = outputs.cpu().numpy().astype(np.float32)
+        preds = np.where(outputs > 0.5, 1, 0).astype(np.uint8)  # binary classification
         # Save predictions to disk
         with h5py.File(self.results_dir / batch["tomo_name"], "a") as fh:
             if "data" in fh:

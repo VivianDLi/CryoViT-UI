@@ -10,7 +10,6 @@ csv_data = []
 zlimit_markers = None
 slice_markers = None
 
-
 def open_next_tomogram(session):
     from chimerax.markers import MarkerSet  # type: ignore
     from chimerax.core.colors import Color  # type: ignore
@@ -18,13 +17,18 @@ def open_next_tomogram(session):
     global zlimit_markers, slice_markers
 
     session.logger.info(f"Opening {files[file_n]}")
-    models, _ = session.open_command.open_data(str(files[file_n]))
-    # Create marker sets
-    zlimit_markers = MarkerSet(session, name="zlimits")
-    zlimit_markers.set_color(Color((1, 0, 0)))
-    slice_markers = MarkerSet(session, name="slices")
-    slice_markers.set_color(Color((0, 1, 0)))
-    session.models.add([models[0], zlimit_markers, slice_markers])
+    try:
+        models, _ = session.open_command.open_data(str(files[file_n]))
+        # Create marker sets
+        zlimit_markers = MarkerSet(session, name="zlimits")
+        zlimit_markers.set_color(Color((1, 0, 0)))
+        slice_markers = MarkerSet(session, name="slices")
+        slice_markers.set_color(Color((0, 1, 0)))
+        session.models.add(models)
+        session.models.add([zlimit_markers, slice_markers])
+    except Exception as e:
+        session.logger.error(f"Error opening tomogram {files[file_n]}: {e}")
+        return
 
 
 def save_slices(session, filename, slices):
@@ -35,24 +39,30 @@ def save_slices(session, filename, slices):
 
     global dst_path
 
-    # Get tomogram data from Volume model
-    data = None
-    for model in session.models:
-        if isinstance(model, Volume):
-            data = model.data.read_matrix((0, 0, 0), model.data.size, (1, 1, 1), False)
-    # Check data was found
-    if data is None:
-        session.logger.error(f"No tomogram data found to save.")
-        return
+    try:
+        # Get tomogram data from Volume model
+        data = None
+        for model in session.models:
+            if isinstance(model, Volume):
+                data = model.data.read_matrix(
+                    (0, 0, 0), model.data.size, (1, 1, 1), False
+                )
+        # Check data was found
+        if data is None:
+            session.logger.error(f"No tomogram data found to save.")
+            return
 
-    # Save slices as image
-    for idx in slices:
-        out_path = os.path.join(dst_path, f"{filename[:-4]}_{idx}.png")
-        img = data[idx]
-        # Normalize and convert to uint8
-        img = ((img + 1) * 0.5 * 255 / np.max(img)).astype("uint8")
-        img = Image.fromarray(img)
-        img.save(out_path)
+        # Save slices as image
+        for idx in slices:
+            out_path = os.path.join(dst_path, f"{filename[:-4]}_{idx}.png")
+            img = data[idx]
+            # Normalize and convert to uint8
+            img = ((img + 1) * 0.5 * 255 / np.max(img)).astype("uint8")
+            img = Image.fromarray(img)
+            img.save(out_path)
+    except Exception as e:
+        session.logger.error(f"Error saving slices for {filename}: {e}")
+        return
 
 
 def set_tomogram_slices(
@@ -153,7 +163,6 @@ def next_tomogram(session):
             writer.writerow(header)
             writer.writerows(csv_data)
         session.logger.info(f"Saved {len(csv_data)} tomograms to {csv_path}.")
-
 
 def register_commands(logger):
     from chimerax.core.commands import (  # type: ignore
