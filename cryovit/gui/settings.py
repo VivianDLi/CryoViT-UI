@@ -445,6 +445,7 @@ class PreprocessingSettings(BaseSetting):
     """Dataclass to hold preprocessing settings."""
 
     bin_size: int = 2
+    resize_image: List[str] = dataclasses.field(default_factory=lambda: ["512", "512"])
     normalize: bool = True
     clip: bool = True
 

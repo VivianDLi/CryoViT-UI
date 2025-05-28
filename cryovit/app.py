@@ -150,7 +150,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.progress_dict[name]["count"],
             self.progress_dict[name]["total"],
         )
-        self._update_progress_bar(count, total)
+        if total > 0:  # Avoid no sample processes
+            self._update_progress_bar(count, total)
         if count >= total:
             QGuiApplication.restoreOverrideCursor()
             self.log("success", f"{name} complete.")
@@ -233,8 +234,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             is_train (bool): Whether to use widgets in the train tab to determine arguments.
         """
         # Get optional kwargs from settings
+        resize_image = self.settings.get_setting("preprocessing/resize_image")
+        try:
+            resize_image = [int(x) for x in resize_image] if resize_image else None
+        except:
+            self.log(
+                "error",
+                "Invalid resize image setting. Must be a tuple of two integers.",
+            )
         kwargs = {
             "bin_size": self.settings.get_setting("preprocessing/bin_size"),
+            "resize_image": resize_image,
             "normalize": self.settings.get_setting("preprocessing/normalize"),
             "clip": self.settings.get_setting("preprocessing/clip"),
         }
@@ -518,13 +528,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             case "linux":  # Has chimerax from command line
                 chimerax_path = "chimerax"
             case "darwin":  # Needs to be run from a specific path
-                if (
-                    not os.path.isfile(chimerax_path)
-                    or not chimerax_path.name.lower() == "chimerax.app"
-                ):
+                if not os.path.isfile(chimerax_path):
                     self.log(
                         "error",
-                        f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.app application typically found in '/Applications/ChimeraX.app'. Please set it in the settings.",
+                        f"Invalid ChimeraX path: {chimerax_path}. This should be in chimerax_install_dir/Contents/MacOS/ChimeraX where 'chimerax_install_dir' is typically '/Applications/ChimeraX.app'. Please set it in the settings.",
                     )
                     return None
             case _:

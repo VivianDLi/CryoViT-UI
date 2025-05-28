@@ -221,7 +221,7 @@ def select_file_folder_dialog(
     Returns:
         Union[str, List[str]]: Paths to the selected files/folders.
     """
-    parent.log("info", f"Opening {title} dialog...")
+    parent.log("info", f"{title}")
     dialog = QFileDialog(parent, caption=title)
     dialog.setFileMode(
         QFileDialog.FileMode.Directory

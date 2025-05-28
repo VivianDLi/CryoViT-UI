@@ -4,8 +4,10 @@ import os
 import sys
 import logging
 from pathlib import Path
+from typing import Tuple
 
 from tqdm import tqdm
+import mrcfile
 from h5py import File
 import numpy as np
 import torch
@@ -51,10 +53,30 @@ def normalize_data(data: np.ndarray, clip: bool) -> np.ndarray:
     return data
 
 
+def resize_data(data: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+    """Resize tomogram data to a specified size.
+
+    Args:
+        data (np.ndarray): The tomogram data to be resized.
+        size (Tuple[int, int]): The target size (height, width) for the tomogram."""
+    # Add channel dimension for interpolation, treating slices as batch
+    data = np.expand_dims(data, axis=1)  # (D, H, W) => (D, 1, H, W)
+    torch_data = torch.from_numpy(data)
+    # Resize the tomogram to the target size
+    data = torch.nn.functional.interpolate(
+        torch_data,
+        size=size,
+        mode="bilinear",
+        align_corners=False,
+    )
+    return data.squeeze(1).numpy()  # (D, 1, H, W) => (D, H, W)
+
+
 def run_preprocess(
     src_dir: Path,
     dst_dir: Path = None,
     bin_size: int = 2,
+    resize_image: Tuple[int, int] = None,
     normalize: bool = True,
     clip: bool = True,
 ) -> None:
@@ -70,15 +92,24 @@ def run_preprocess(
     files = list(p.resolve() for p in src_dir.glob("*") if p.suffix in tomogram_exts)
     logger.info(f"Found {len(files)} files in {src_dir}.")
     for file_name in tqdm(files, desc="Pre-processing tomograms"):
-        logger.debug(f"Processing {file_name}.")
         # load tomogram
-        with File(file_name, "r") as fh:
-            data = (
-                fh["MDF"]["images"]["0"]["image"][()] if "MDF" in fh else fh["data"][()]
-            )
+        try:  # try loading with h5py
+            with File(file_name, "r") as fh:
+                data = (
+                    fh["MDF"]["images"]["0"]["image"][()]
+                    if "MDF" in fh
+                    else fh["data"][()]
+                )
+        except OSError as e:
+            logger.error(f"Error reading file {file_name}: {e}")
+            # try loading with mrcfile
+            data = mrcfile.read(file_name)
         # pool tomogram
         if bin_size > 1:
             data = pool(data, bin_size)
+        # resize tomogram
+        if resize_image is not None:
+            data = resize_data(data, resize_image)
         # normalize tomogram
         if normalize:
             data = normalize_data(data, clip)
@@ -88,7 +119,8 @@ def run_preprocess(
         else:
             os.makedirs(dst_dir, exist_ok=True)
             dst_path = dst_dir / file_name.name
-        with File(dst_path, "a") as fh:
+        # Save processed data as hdf5 file
+        with File(dst_path.parent / (dst_path.stem + ".hdf"), "w") as fh:
             if "data" in fh:
                 del fh["data"]
             fh.create_dataset("data", data=data)
