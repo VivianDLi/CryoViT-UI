@@ -92,6 +92,12 @@ def run_preprocess(
     files = list(p.resolve() for p in src_dir.glob("*") if p.suffix in tomogram_exts)
     logger.info(f"Found {len(files)} files in {src_dir}.")
     for file_name in tqdm(files, desc="Pre-processing tomograms"):
+        # setup destination path
+        if dst_dir is None:
+            dst_dir = file_name
+        else:
+            os.makedirs(dst_dir, exist_ok=True)
+            dst_path = dst_dir / file_name.name
         # load tomogram
         try:  # try loading with h5py
             with File(file_name, "r") as fh:
@@ -109,16 +115,25 @@ def run_preprocess(
             data = pool(data, bin_size)
         # resize tomogram
         if resize_image is not None:
+            original_size = data.shape[1:3]  # (D, H, W) => (H, W)
             data = resize_data(data, resize_image)
+            # Save original size, new size, and scale factor in a text file
+            scale_factor = (
+                resize_image[0] / original_size[0],
+                resize_image[1] / original_size[1],
+            )
         # normalize tomogram
         if normalize:
             data = normalize_data(data, clip)
-        # save tomogram
-        if dst_dir is None:
-            dst_dir = file_name
-        else:
-            os.makedirs(dst_dir, exist_ok=True)
-            dst_path = dst_dir / file_name.name
+        # Save preprocessing parameters in a text file
+        with open(dst_path.parent / (dst_path.stem + "_preprocessing.txt"), "w+") as f:
+            f.write(f"Normalize: {normalize}\n")
+            f.write(f"Clip: {clip}\n")
+            f.write(f"Bin size: {bin_size}\n")
+            if resize_image is not None:
+                f.write(f"Original size: {original_size}\n")
+                f.write(f"Resize image: {resize_image}\n")
+                f.write(f"Scale factor: {scale_factor}\n")
         # Save processed data as hdf5 file
         with File(dst_path.parent / (dst_path.stem + ".hdf"), "w") as fh:
             if "data" in fh:
