@@ -10,7 +10,8 @@ from PyQt6.QtWidgets import (
     QInputDialog,
 )
 
-from cryovit.config import InterfaceModelConfig, models, ModelArch, TrainerFit
+from cryovit.config import TrainerFit
+from cryovit.gui.config import InterfaceModelConfig, ModelArch, models
 from cryovit.gui.layouts.modeldialog import Ui_ModelDialog
 
 

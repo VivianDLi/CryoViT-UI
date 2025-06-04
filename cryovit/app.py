@@ -33,6 +33,19 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QDesktopServices, QGuiApplication
 
+import cryovit.gui.resources
+from cryovit.gui.layouts.mainwindow import Ui_MainWindow
+from cryovit.gui.ui import (
+    ModelDialog,
+    PresetDialog,
+    SettingsWindow,
+    MultiSelectComboBox,
+)
+from cryovit.gui.utils import (
+    EmittingStream,
+    select_file_folder_dialog,
+)
+from cryovit.gui.config import InterfaceModelConfig, ModelArch, models
 from cryovit.config import (
     DinoFeaturesConfig,
     ExpPaths,
@@ -41,22 +54,11 @@ from cryovit.config import (
     Inference,
     TrainModelConfig,
     InferModelConfig,
-    InterfaceModelConfig,
-    ModelArch,
-    tomogram_exts,
+    TrainerFit,
+    TrainerInfer,
     samples,
-    models,
+    tomogram_exts,
 )
-import cryovit.gui.resources
-from cryovit.gui.layouts.mainwindow import Ui_MainWindow
-from cryovit.gui.model_config import ModelDialog
-from cryovit.gui.settings import PresetDialog, SettingsWindow
-from cryovit.gui.utils import (
-    EmittingStream,
-    MultiSelectComboBox,
-    select_file_folder_dialog,
-)
-from cryovit.config import TrainerFit, TrainerInfer
 from cryovit.processing import *
 
 
@@ -197,7 +199,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         super().__init__(*args, **kwargs)
         self.setupUi(self)
         # Setup settings
-        self.settings = SettingsWindow(self)
+        try:
+            self.settings = SettingsWindow(self)
+        except ValueError as e:
+            sys.stderr.write(f"Error loading settings: {e}\nResetting to defaults.")
+            SettingsWindow.reset_settings()
+            self.settings = SettingsWindow(self)
         # Setup thread pool and processes
         self.threadpool: QThreadPool = (
             QThreadPool.globalInstance()
@@ -559,7 +566,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No CSV directory specified.")
             return
-        num_splits = self.settings.get_setting("training/number_of_splits")
+        num_splits = self.settings.get_setting("training/num_splits")
         seed = self.settings.get_setting("training/random_seed")
         if not self.features:
             self.log(
@@ -657,16 +664,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No CSV directory specified. Please specify a CSV directory.",
             )
             return
-        num_splits = self.settings.get_setting("training/number_of_splits")
+        num_splits = self.settings.get_setting("training/num_splits")
         seed = self.settings.get_setting("training/random_seed")
 
         # Get splits file or set it to default value
-        splits_file = self.settings.get_setting("training/splits_file")
-        if splits_file:
+        splits_file, ok = QInputDialog.getText(
+            self, "Splits File", "Enter splits file path:"
+        )
+        if ok and splits_file:
             splits_file = Path(splits_file).resolve()
         else:
             splits_file = csv_dir / "splits.csv"
-            self.settings.set_setting("training/splits_file", str(splits_file))
             self.log(
                 "warning",
                 f"No splits file specified in Settings. Using {splits_file}.",
@@ -918,12 +926,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # Get directories
-        split_file = self.settings.get_setting("training/splits_file")
-        if split_file:
+        split_file, ok = QInputDialog.getText(
+            self, "Splits File", "Enter splits file path:"
+        )
+        if ok and split_file:
             split_file = Path(split_file).resolve()
         else:
             split_file = csv_dir / "splits.csv"
-            self.settings.set_setting("training/splits_file", str(split_file))
         features_dir = self.settings.get_setting("dino/features_directory")
         if features_dir:
             features_dir = Path(features_dir).resolve()

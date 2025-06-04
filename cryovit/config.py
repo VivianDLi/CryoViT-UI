@@ -23,15 +23,6 @@ class Sample(Enum):
 
 samples = [sample.name for sample in Sample]
 
-
-class ModelArch(Enum):
-    CRYOVIT = "CryoViT"
-    UNET3D = "UNet3D"
-
-
-models = [model.name for model in ModelArch]
-
-
 tomogram_exts = [".rec", ".mrc", ".hdf"]
 
 
@@ -121,7 +112,7 @@ class PretrainedModel:
     name: str = MISSING
     label_key: str = MISSING
     model_weights: Path = MISSING
-    model_type: ModelArch = MISSING
+    model_type: str = MISSING
     model: Model = MISSING
 
 
@@ -394,30 +385,6 @@ class InferModelConfig:
     dataset: Dataset = MISSING
     exp_paths: ExpPaths = MISSING
     dataloader: DataLoader = field(default=DataLoader())
-
-
-@dataclass
-class InterfaceModelConfig:
-    """Metadata for a model for GUI use."""
-
-    name: str
-    label_key: str
-    model_type: ModelArch
-    model_weights: Path
-    model_params: Dict[str, Union[str, int, float]]
-    samples: List[str]
-
-    def to_json(self) -> dict:
-        """Convert the model configuration to a JSON serializable format."""
-        json_dict = {
-            "name": self.name,
-            "label_key": self.label_key,
-            "model_type": self.model_type.name,
-            "model_weights": str(self.model_weights.resolve()),
-            "model_params": dict(self.model_params),
-            "samples": list(map(str, self.samples)),
-        }
-        return json_dict
 
 
 cs = ConfigStore.instance()

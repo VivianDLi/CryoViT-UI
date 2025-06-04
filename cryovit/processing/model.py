@@ -7,12 +7,11 @@ from typing import Any, List, Tuple
 import logging
 
 from cryovit.config import (
-    InterfaceModelConfig,
     Model,
     CryoVIT,
     UNet3D,
-    ModelArch,
 )
+from cryovit.gui.config import InterfaceModelConfig, ModelArch
 
 # Setup logger
 logger = logging.getLogger(__name__)
