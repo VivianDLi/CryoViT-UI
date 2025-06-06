@@ -259,7 +259,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No raw data directory specified.")
             return
-        if self.replaceCheckboxProc.isChecked():
+        if not self.replaceCheckboxProc.isChecked():
             if self.replaceDirectoryProc.text():
                 dst_dir = Path(self.replaceDirectoryProc.text()).resolve()
             else:
@@ -273,24 +273,41 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if len(samples) == 0:  # add end of src_dir as sample
             samples = [src_dir.name]
             src_dir = src_dir.parent
+            self.rawDirectory.setText(str(src_dir))
             dst_dir = dst_dir.parent
+            self.replaceDirectoryProc.setText(str(dst_dir))
             self.sampleSelectCombo.setCurrentData(samples)
 
         # Get files
-        target_dirs = [src_dir / sample for sample in samples if os.path.isdir(src_dir / sample)]
-        skipped_samples = [sample for sample in samples if not os.path.isdir(src_dir / sample)]
+        src_dirs = [
+            src_dir / sample for sample in samples if os.path.isdir(src_dir / sample)
+        ]
+        dst_dirs = [
+            dst_dir / sample for sample in samples if os.path.isdir(dst_dir / sample)
+        ]
+        skipped_samples = [
+            sample for sample in samples if not os.path.isdir(src_dir / sample)
+        ]
         if skipped_samples:
             self.log(
                 "warning",
                 f"Skipping samples with invalid directories: {', '.join(skipped_samples)}.",
             )
-        filenames = [[p.resolve().name for p in target_dir.glob("*") if p.suffix in tomogram_exts] for target_dir in target_dirs]
-        filenames = [f for sublist in filenames for f in sublist]  # Flatten the list of lists
+        src_files = []
+        dst_files = []
+        for i in range(len(src_dirs)):
+            filenames = [
+                p.resolve().name
+                for p in src_dirs[i].glob("*")
+                if p.suffix in tomogram_exts
+            ]
+            src_files.extend([src_dirs[i] / filename for filename in filenames])
+            dst_files.extend([dst_dirs[i] / filename for filename in filenames])
         # Confirm files found
         ok = QMessageBox.question(
             self,
             "Confirm Preprocessing",
-            f"Found {len(filenames)} tomograms to preprocess in {len(samples)} samples.\n"
+            f"Found {len(src_files)} tomograms to preprocess in {len(samples)} samples.\n"
             "Do you want to continue?",
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
@@ -303,13 +320,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             os.makedirs(dst_dir, exist_ok=True)
         # Setup thread callbacks
         finish_callback = partial(self._on_thread_finish, "Preprocessing")
-        self.progress_dict["Preprocessing"] = {"count": 0, "total": len(filenames)}
+        self.progress_dict["Preprocessing"] = {"count": 0, "total": len(src_files)}
         # For multi-sample train pre-processing to use multithreading
-        for filename in filenames:
+        for src_file, dst_file in zip(src_files, dst_files):
             worker = Worker(
                 run_preprocess,
-                src_dir / filename,
-                dst_dir / filename,
+                src_file,
+                dst_file,
                 **kwargs,
             )
             worker.signals.finish.connect(finish_callback)
@@ -349,6 +366,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if len(samples) == 0:  # add end of src_dir as sample
             samples = [src_dir.name]
             src_dir = src_dir.parent
+            self.dataDirectoryTrain.setText(str(src_dir))
             self.sampleSelectCombo.setCurrentData(samples)
         num_slices = self.settings.get_setting("annotation/num_slices")
         # Sequentially process each sample
@@ -552,6 +570,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if len(samples) == 0:  # add end of src_dir as sample
             samples = [src_dir.name]
             src_dir = src_dir.parent
+            self.dataDirectoryTrain.setText(str(src_dir))
+            self.sampleSelectCombo.setCurrentData(samples)
         # Get splits file
         splits_file = select_file_folder_dialog(
             self,
@@ -1285,6 +1305,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 False,
             )
         )
+        self.dataSelectTrain.clicked.connect(
+            partial(
+                self._file_directory_prompt,
+                self.dataDirectoryTrain,
+                "processed tomogram",
+                True,
+                False,
+            )
+        )
         self.csvSelect.clicked.connect(
             partial(
                 self._file_directory_prompt,
@@ -1334,6 +1363,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Setup folder displays
         self.rawDirectory.editingFinished.connect(
             partial(self._update_file_directory_field, self.rawDirectory, True)
+        )
+        self.dataDirectory.editingFinished.connect(
+            partial(self._update_file_directory_field, self.dataDirectory, True)
+        )
+        self.dataDirectoryTrain.editingFinished.connect(
+            partial(self._update_file_directory_field, self.dataDirectoryTrain, True)
         )
         self.csvDirectory.editingFinished.connect(
             partial(self._update_file_directory_field, self.csvDirectory, True)
@@ -1511,7 +1546,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.chimeraButton.clicked.connect(self.run_chimerax)
         self.splitsButton.clicked.connect(self.run_generate_training_splits)
         self.splitsButtonNew.clicked.connect(self.run_new_training_splits)
-        self.featureButtonSeg.clicked.connect(self.run_feature_extraction)
         self.featureButtonTrain.clicked.connect(self.run_feature_extraction)
         self.segmentButton.clicked.connect(self.run_segmentation)
         self.trainButton.clicked.connect(self.run_training)
@@ -1725,7 +1759,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def _update_progress_bar(self, index: int, total: int):
         """Update the progress bar with the current index (assume 0-indexed) and total."""
-        self.progressBar.setValue((index // total) * self.progressBar.maximum())
+        self.progressBar.setValue(round((index / total) * self.progressBar.maximum()))
 
     def log(self, mode: str, text: str, end="\n", use_timestamp: bool = True):
         """Write text to the console with a timestamp and different colors for normal output and errors."""

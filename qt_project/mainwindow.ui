@@ -400,13 +400,6 @@ color: rgb(20, 20, 20);</string>
              </widget>
             </widget>
            </item>
-           <item row="5" column="0" colspan="11">
-            <widget class="QPushButton" name="featureButtonSeg">
-             <property name="text">
-              <string>Calculate Features</string>
-             </property>
-            </widget>
-           </item>
            <item row="0" column="0">
             <widget class="QLabel" name="dataDirectoryLabel">
              <property name="text">
@@ -428,7 +421,7 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
-           <item row="7" column="0" colspan="11">
+           <item row="5" column="0" colspan="11">
             <widget class="QPushButton" name="segmentButton">
              <property name="font">
               <font>

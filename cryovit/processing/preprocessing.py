@@ -124,7 +124,7 @@ def run_preprocess(
             f.write(f"Resize image: {resize_image}\n")
             f.write(f"Scale factor: {scale_factor}\n")
     # Save processed data as hdf5 file
-    with File(dst_file, "w") as fh:
+    with File(dst_file.parent / (dst_file.stem + ".hdf"), "w") as fh:
         if "data" in fh:
             del fh["data"]
         fh.create_dataset("data", data=data)
