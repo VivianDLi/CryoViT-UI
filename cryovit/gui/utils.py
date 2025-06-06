@@ -59,7 +59,7 @@ def select_file_folder_dialog(
         dialog.setDirectory(start_dir)
 
     if dialog.exec():
-        if is_folder:
+        if not is_multiple:
             return dialog.selectedFiles()[0]
         else:
-            return dialog.selectedFiles() if dialog.selectedFiles() else None
+            return dialog.selectedFiles() or None

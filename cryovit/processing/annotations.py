@@ -85,7 +85,7 @@ def add_annotations(
 
 
 def add_splits(
-    dst_dir: Path,
+    splits_file: Path,
     csv_file: Path,
     sample: str = None,
     num_splits: int = 10,
@@ -94,7 +94,7 @@ def add_splits(
     """Create splits for cross-validation.
 
     Args:
-        dst_dir (Path): Path to the directory where the splits .csv will be saved.
+        splits_file (Path): Path to the file where the splits .csv file will be saved.
         csv_file (Path): Path to the .csv file with annotations.
         sample (str, optional): Sample name to be used in the splits. Defaults to None. If None, the sample name is extracted from the tomogram names.
         num_splits (int, optional): Number of splits for cross-validation. Defaults to 10.
@@ -114,17 +114,17 @@ def add_splits(
     )
 
     # Create splits file if it doesn't exist
-    if not (dst_dir / "splits.csv").exists():
+    if not splits_file.exists():
         splits_df = pd.DataFrame(
             columns=["tomo_name", "z_min", "z_max", "split_id", "sample"]
         )
     else:
-        splits_df = pd.read_csv(dst_dir / "splits.csv")
+        splits_df = pd.read_csv(splits_file)
     # remove matching rows from the splits_df
     splits_df = splits_df[~splits_df["tomo_name"].isin(annotation_df["tomo_name"])]
     # append new rows to the splits_df
     splits_df = pd.concat([splits_df, annotation_df], ignore_index=True)
-    splits_df.to_csv(dst_dir / "splits.csv", mode="w", index=False)
+    splits_df.to_csv(splits_file, mode="w", index=False)
 
 
 def generate_new_splits(

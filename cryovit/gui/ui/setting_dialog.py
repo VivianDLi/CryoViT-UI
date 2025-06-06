@@ -74,6 +74,7 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                 )
                 # Create label for the field
                 label = QLabel(parent=parent_widget, text=field.name + ":")
+                label.setToolTip(field.description)
                 data = self._create_UI_element(parent_widget, field)
                 # Prevent garbage collection of objects
                 setattr(self, f"label_{self.variables[settings_path]}", label)
@@ -216,10 +217,10 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
                 )
             case SettingsInputType.NUMBER:
                 data = QSpinBox(parent=parent_widget)
-                data.setValue(settings_field.get_value())
-                data.setKeyboardTracking(False)
                 data.setRange(0, 10000)
                 data.setSingleStep(1)
+                data.setValue(settings_field.get_value())
+                data.setKeyboardTracking(False)
             case SettingsInputType.BOOL:
                 data = QCheckBox(parent=parent_widget)
                 data.setChecked(settings_field.get_value())

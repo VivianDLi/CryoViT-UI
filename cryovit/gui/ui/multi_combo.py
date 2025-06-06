@@ -38,6 +38,8 @@ class MultiSelectComboBox(QComboBox):
         self.view().viewport().installEventFilter(self)
         self.lineEdit().installEventFilter(self)
         self.model().dataChanged.connect(self.updateText)
+        self.model().rowsInserted.connect(self.updateText)
+        self.model().rowsRemoved.connect(self.updateText)
 
     def resizeEvent(self, event) -> None:
         """Override resizeEvent to also adjust display text."""
@@ -102,7 +104,10 @@ class MultiSelectComboBox(QComboBox):
         item = QStandardItem(text)
         item.setText(text)
         item.setFlags(Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled)
-        item.setData(Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked, Qt.ItemDataRole.CheckStateRole)
+        item.setData(
+            Qt.CheckState.Checked if checked else Qt.CheckState.Unchecked,
+            Qt.ItemDataRole.CheckStateRole,
+        )
         self.model().appendRow(item)
 
     def addItems(self, texts: List[str]) -> None:
@@ -123,7 +128,7 @@ class MultiSelectComboBox(QComboBox):
                 QLineEdit.EchoMode.Normal,
             )
             if ok and new_item:
-                self.addItem(new_item)
+                self.addItem(new_item, checked=True)
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error adding new item: {e}\n")
 
@@ -145,7 +150,6 @@ class MultiSelectComboBox(QComboBox):
             self.model().item(i).setCheckState(
                 Qt.CheckState.Checked if i in indexes else Qt.CheckState.Unchecked
             )
-        self.updateText()
 
     def getCurrentData(self) -> List[str]:
         """Get the currently selected options as strings."""

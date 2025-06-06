@@ -21,6 +21,22 @@ models = [model.name for model in ModelArch]
 
 #### Interface Config Dataclasses ####
 
+ignored_config_keys = [
+    "aux_keys",
+    "dataloader",
+    "cryovit_root",
+    "test_samples",
+    "split_id",
+    "logger",
+    "callbacks",
+    "losses",
+    "metrics",
+    "models",
+    "all_samples",
+    "_target_",
+    "_partial_",
+]
+
 
 @dataclass
 class InterfaceModelConfig:
@@ -93,9 +109,13 @@ class SettingField:
             case SettingsInputType.BOOL:
                 return self.value.lower() in ["true", "1", "yes"]
             case SettingsInputType.STR_LIST:
-                return list(map(str.strip, self.value.split(",")))
+                return list(map(str.strip, self.value.split(","))) if self.value else []
             case SettingsInputType.INT_LIST:
-                return list(map(int, map(str.strip, self.value.split(","))))
+                return (
+                    list(map(int, map(str.strip, self.value.split(","))))
+                    if self.value
+                    else []
+                )
         return self.value
 
     def get_value_as_str(self) -> str:
@@ -246,6 +266,13 @@ class DinoSettings(BaseSetting):
         default="./DINOv2",
         required=True,
         description="Directory where the DINO model weights are stored.",
+    )
+    feature_directory: SettingField = SettingField(
+        "DINO Feature Directory",
+        input_type=SettingsInputType.DIRECTORY,
+        default="./DINOv2/features",
+        required=True,
+        description="Directory where the computed DINO model features are stored.",
     )
     batch_size: SettingField = SettingField(
         "DINO Batch Size",

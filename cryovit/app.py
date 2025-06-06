@@ -45,7 +45,12 @@ from cryovit.gui.utils import (
     EmittingStream,
     select_file_folder_dialog,
 )
-from cryovit.gui.config import InterfaceModelConfig, ModelArch, models
+from cryovit.gui.config import (
+    InterfaceModelConfig,
+    ModelArch,
+    models,
+    ignored_config_keys,
+)
 from cryovit.config import (
     DinoFeaturesConfig,
     ExpPaths,
@@ -147,14 +152,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         Args:
             name (str): Name of the process that finished.
         """
-        self.progress_dict[name]["count"] += 1
-        count, total = (
-            self.progress_dict[name]["count"],
-            self.progress_dict[name]["total"],
-        )
-        if total > 0:  # Avoid no sample processes
-            self._update_progress_bar(count, total)
-        if count >= total:
+        if name in self.progress_dict:
+            self.progress_dict[name]["count"] += 1
+            count, total = (
+                self.progress_dict[name]["count"],
+                self.progress_dict[name]["total"],
+            )
+            if total > 0:  # Avoid no sample processes
+                self._update_progress_bar(count, total)
+            if count >= total:
+                QGuiApplication.restoreOverrideCursor()
+                self.log("success", f"{name} complete.")
+        else:
             QGuiApplication.restoreOverrideCursor()
             self.log("success", f"{name} complete.")
 
@@ -234,82 +243,75 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.log("success", "Welcome to CryoViT!")
 
     @_catch_exceptions("preprocessing", concurrent=True)
-    def run_preprocessing(self, is_train: bool, *args):
-        """Background thread to bin, normalize, and clip tomograms.
-
-        Args:
-            is_train (bool): Whether to use widgets in the train tab to determine arguments.
-        """
+    def run_preprocessing(self, *args):
+        """Background thread to bin, normalize, and clip tomograms."""
         # Get optional kwargs from settings
         resize_image = self.settings.get_setting("preprocessing/resize_image")
-        try:
-            resize_image = [int(x) for x in resize_image] if resize_image else None
-        except:
-            self.log(
-                "error",
-                "Invalid resize image setting. Must be a tuple of two integers.",
-            )
         kwargs = {
             "bin_size": self.settings.get_setting("preprocessing/bin_size"),
-            "resize_image": resize_image,
+            "resize_image": resize_image or None,
             "normalize": self.settings.get_setting("preprocessing/normalize"),
             "clip": self.settings.get_setting("preprocessing/clip"),
         }
         # Get directories from settings
-        if is_train:
-            raw_dir = self.rawDirectoryTrain
-            replace = self.replaceCheckboxProcTrain.isChecked()
-            replace_dir = self.replaceDirectoryProcTrain
+        if self.rawDirectory.text():
+            src_dir = Path(self.rawDirectory.text()).resolve()
         else:
-            raw_dir = self.rawDirectory
-            replace = self.replaceCheckboxProc.isChecked()
-            replace_dir = self.replaceDirectoryProc
-        if raw_dir.text():
-            src_dir = Path(raw_dir.text()).resolve()
-        else:
-            self.log("warning", "No data directory specified.")
+            self.log("warning", "No raw data directory specified.")
             return
-        if replace:
-            replace_dir.setText(str(src_dir))
-        if replace_dir.text():
-            dst_dir = Path(replace_dir.text()).resolve()
+        if self.replaceCheckboxProc.isChecked():
+            if self.replaceDirectoryProc.text():
+                dst_dir = Path(self.replaceDirectoryProc.text()).resolve()
+            else:
+                self.log("warning", "No replace directory specified.")
+                return
         else:
-            self.log("warning", "No replace directory specified.")
-            return
-
-        # Setup thread callbacks
-        finish_callback = partial(self._on_thread_finish, "Preprocessing")
-        self.progress_dict["Preprocessing"] = {"count": 0, "total": 0}
+            self.replaceDirectoryProc.setText(str(src_dir))
+            dst_dir = src_dir
         # Check for samples
         samples = self.sampleSelectCombo.getCurrentData()
-        if is_train and samples:
-            # For multi-sample train pre-processing to use multithreading
-            self.progress_dict["Preprocessing"]["total"] = len(samples)
-            for sample in samples:
-                if not os.path.isdir(src_dir / sample):
-                    self.log(
-                        "warning",
-                        f"Invalid raw directory: {src_dir / sample}, skipping sample.",
-                    )
-                    continue
-                worker = Worker(
-                    run_preprocess,
-                    src_dir / sample,
-                    dst_dir / sample,
-                    **kwargs,
-                )
-                worker.signals.finish.connect(finish_callback)
-                worker.signals.error.connect(self._handle_thread_exception)
-                self.threadpool.start(worker)
+        if len(samples) == 0:  # add end of src_dir as sample
+            samples = [src_dir.name]
+            src_dir = src_dir.parent
+            dst_dir = dst_dir.parent
+            self.sampleSelectCombo.setCurrentData(samples)
+
+        # Get files
+        target_dirs = [src_dir / sample for sample in samples if os.path.isdir(src_dir / sample)]
+        skipped_samples = [sample for sample in samples if not os.path.isdir(src_dir / sample)]
+        if skipped_samples:
+            self.log(
+                "warning",
+                f"Skipping samples with invalid directories: {', '.join(skipped_samples)}.",
+            )
+        filenames = [[p.resolve().name for p in target_dir.glob("*") if p.suffix in tomogram_exts] for target_dir in target_dirs]
+        filenames = [f for sublist in filenames for f in sublist]  # Flatten the list of lists
+        # Confirm files found
+        ok = QMessageBox.question(
+            self,
+            "Confirm Preprocessing",
+            f"Found {len(filenames)} tomograms to preprocess in {len(samples)} samples.\n"
+            "Do you want to continue?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if ok != QMessageBox.StandardButton.Yes:
+            return
+        # Setup destination path
+        if dst_dir is None:
+            dst_dir = src_dir
         else:
-            # Single sample train pre-processing and segmentation pre-processing are both 1 folder
-            if not os.path.isdir(src_dir):
-                self.log(
-                    "error",
-                    f"Invalid raw directory: {src_dir}.",
-                )
-                return
-            worker = Worker(run_preprocess, src_dir, dst_dir, **kwargs)
+            os.makedirs(dst_dir, exist_ok=True)
+        # Setup thread callbacks
+        finish_callback = partial(self._on_thread_finish, "Preprocessing")
+        self.progress_dict["Preprocessing"] = {"count": 0, "total": len(filenames)}
+        # For multi-sample train pre-processing to use multithreading
+        for filename in filenames:
+            worker = Worker(
+                run_preprocess,
+                src_dir / filename,
+                dst_dir / filename,
+                **kwargs,
+            )
             worker.signals.finish.connect(finish_callback)
             worker.signals.error.connect(self._handle_thread_exception)
             self.threadpool.start(worker)
@@ -318,18 +320,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def run_chimerax(self, *args):
         """Launch ChimeraX externally to select z-limits and tomogram slices to label (and create .csv file)."""
         # Get path to ChimeraX executable (only matters on Windows or Mac)
-        chimerax_path = self.settings.get_setting("annotation/chimera_path")
-        if not chimerax_path and platform.system().lower() != "linux":
+        chimera_path = self.settings.get_setting("annotation/chimera_path")
+        if not chimera_path and platform.system().lower() != "linux":
             self.log(
                 "warning",
                 "ChimeraX path not set. Please set it in the settings.",
             )
             return
-        else:
-            chimerax_path = Path(chimerax_path if chimerax_path else "").resolve()
 
         # Get directories from settings
-        samples = self.sampleSelectCombo.getCurrentData()
         if self.dataDirectoryTrain.text():
             src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
@@ -338,53 +337,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.sliceDirectory.text():
             dst_dir = Path(self.sliceDirectory.text()).resolve()
         else:
-            dst_dir = (
-                src_dir.resolve() / "slices"
-                if samples
-                else src_dir.parent.resolve() / "slices"
-            )
-            self.sliceDirectory.setText(str(dst_dir))
-            self.log(
-                "warning",
-                f"No slice directory specified. Slices will be saved in {src_dir.resolve() / 'slices/sample' if samples else src_dir.parent.resolve() / 'slices'}.",
-            )
+            self.log("warning", "No slice directory specified.")
+            return
         if self.csvDirectory.text():
             csv_dir = Path(self.csvDirectory.text()).resolve()
         else:
-            csv_dir = (
-                src_dir.parent.resolve() / "csv"
-                if samples
-                else src_dir.parent.parent.resolve() / "csv"
-            )
-            self.csvDirectory.setText(str(csv_dir))
-            self.log(
-                "warning",
-                f"No CSV directory specified. CSV files will be saved in {src_dir.parent.resolve() / 'csv' if samples else src_dir.parent.parent.resolve() / 'csv'}.",
-            )
+            self.log("warning", "No CSV directory specified.")
+            return
+        # Check for samples
+        samples = self.sampleSelectCombo.getCurrentData()
+        if len(samples) == 0:  # add end of src_dir as sample
+            samples = [src_dir.name]
+            src_dir = src_dir.parent
+            self.sampleSelectCombo.setCurrentData(samples)
         num_slices = self.settings.get_setting("annotation/num_slices")
-        # Check for no samples
-        if not samples:
-            self._next_chimera_process(
-                0, chimerax_path, src_dir, None, dst_dir, csv_dir, num_slices
-            )
-        else:
-            # Sequentially process each sample
-            self._next_chimera_process(
-                0,
-                chimerax_path,
-                src_dir,
-                samples,
-                dst_dir,
-                csv_dir,
-                num_slices,
-            )
+        # Sequentially process each sample
+        self._next_chimera_process(
+            0,
+            chimera_path,
+            src_dir,
+            samples,
+            dst_dir,
+            csv_dir,
+            num_slices,
+        )
 
     def _next_chimera_process(
         self,
         index: int,
-        chimerax_path: Path,
+        chimera_path: Path,
         src_dir: Path,
-        samples: List[str] | None,
+        samples: List[str],
         dst_dir: Path,
         csv_dir: Path,
         num_slices: int,
@@ -401,31 +384,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             num_slices (int): Number of slices to process.
         """
         self.chimera_process = None
-        if samples:
-            # Update progress bar and check for completion
-            self._update_progress_bar(index + 1, len(samples))
-            if index >= len(samples):
-                self.log("success", "ChimeraX processing complete.")
-                QGuiApplication.restoreOverrideCursor()
-                return
-            sample = samples[index]
-            is_dir = os.path.isdir(src_dir / sample)
-        else:
-            # Check for completion
-            if index >= 1:
-                self.log("success", "ChimeraX processing complete.")
-                QGuiApplication.restoreOverrideCursor()
-                return
-            sample = None
-            is_dir = os.path.isdir(src_dir)
-        if not is_dir:
+        # Update progress bar and check for completion
+        self._update_progress_bar(index + 1, len(samples))
+        if index >= len(samples):
+            self.log("success", "ChimeraX processing complete.")
+            QGuiApplication.restoreOverrideCursor()
+            return
+        sample = samples[index]
+        # Check for valid directory
+        if not os.path.isdir(src_dir / sample):
             self.log(
-                "error",
-                f"Invalid raw directory: {src_dir / sample if sample else src_dir}, skipping sample.",
+                "error", f"Invalid raw directory: {src_dir / sample}, skipping sample."
             )
             self._next_chimera_process(
                 index + 1,
-                chimerax_path,
+                chimera_path,
                 src_dir,
                 samples,
                 dst_dir,
@@ -435,7 +408,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
         # Launch ChimeraX
         command = self._validate_chimerax_process(
-            chimerax_path,
+            chimera_path,
             src_dir,
             sample,
             dst_dir=dst_dir,
@@ -454,7 +427,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 partial(
                     self._next_chimera_process,
                     index + 1,
-                    chimerax_path,
+                    chimera_path,
                     src_dir,
                     samples,
                     dst_dir,
@@ -470,7 +443,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             self._next_chimera_process(
                 index + 1,
-                chimerax_path,
+                chimera_path,
                 src_dir,
                 samples,
                 dst_dir,
@@ -481,7 +454,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def _validate_chimerax_process(
         self,
-        chimerax_path: Path,
+        chimera_path: Path,
         src_dir: Path,
         sample: str = None,
         dst_dir: Path = None,
@@ -491,14 +464,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Generate the start command for ChimeraX to start labeling in the clipboard and return the command to launch ChimeraX.
 
         Args:
-            chimerax_path (Path): Path to the ChimeraX executable.
+            chimera_path (Path): Path to the ChimeraX executable.
             src_dir (Path): Source directory for the tomograms.
             sample (str, optional): Sample name. Defaults to None (i.e., single directory).
             dst_dir (Path, optional): Destination directory for the slices. Defaults to None.
             csv_dir (Path, optional): Destination directory for the CSV files. Defaults to None.
             num_slices (int, optional): Number of slices to process. Defaults to 5.
         """
-        if self.chimera_process is not None:
+        if self.chimera_process is not None:  # process already running
             return None
         # Create script args
         commands = [
@@ -519,38 +492,46 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         command = " ".join(commands)
         # Copy command to clipboard
         pyperclip.copy(command)
-        # Check for OS type
+        # Get ChimeraX executable path based on OS
         match platform.system().lower():
             case "windows":  # Needs to be run from a specific path
                 # Check for valid path
                 if (
-                    not os.path.isfile(chimerax_path)
-                    or not chimerax_path.name.lower() == "chimerax.exe"
+                    not os.path.isfile(chimera_path)
+                    or not chimera_path.name.lower() == "chimerax.exe"
                 ):
                     self.log(
                         "error",
-                        f"Invalid ChimeraX path: {chimerax_path}. This should be the path to the ChimeraX.exe executable typically found in 'C:/Program Files/ChimeraX/bin/ChimeraX.exe'. Please set it in the settings.",
+                        f"Invalid ChimeraX path: {chimera_path}. This should be the path to the ChimeraX.exe executable typically found in 'C:/Program Files/ChimeraX/bin/ChimeraX.exe'. Please set it in the settings.",
                     )
                     return None
             case "linux":  # Has chimerax from command line
-                chimerax_path = "chimerax"
+                chimera_path = "chimerax"
             case "darwin":  # Needs to be run from a specific path
-                if not os.path.isfile(chimerax_path):
+                if not os.path.isfile(chimera_path):
                     self.log(
                         "error",
-                        f"Invalid ChimeraX path: {chimerax_path}. This should be in chimerax_install_dir/Contents/MacOS/ChimeraX where 'chimerax_install_dir' is typically '/Applications/ChimeraX.app'. Please set it in the settings.",
+                        f"Invalid ChimeraX path: {chimera_path}. This should be in chimerax_install_dir/Contents/MacOS/ChimeraX where 'chimerax_install_dir' is typically '/Applications/ChimeraX.app'. Please set it in the settings.",
                     )
                     return None
             case _:
                 self.log("error", f"Unsupported OS type {platform.system()}.")
                 return None
-        return str(chimerax_path)
+        return str(chimera_path)
 
     @_catch_exceptions("generate training splits", concurrent=True)
     def run_generate_training_splits(self, *args):
         """Add annotations to tomograms and generate training splits .csv file."""
+        # Get kwargs from settings
+        num_splits = self.settings.get_setting("training/num_splits")
+        seed = self.settings.get_setting("training/random_seed")
+        if not self.features:
+            self.log(
+                "warning",
+                "No labeled features inputed. Please add annotated features above.",
+            )
+            return
         # Get directories from settings
-        samples = self.sampleSelectCombo.getCurrentData()
         if self.dataDirectoryTrain.text():
             src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
@@ -566,34 +547,46 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No CSV directory specified.")
             return
-        num_splits = self.settings.get_setting("training/num_splits")
-        seed = self.settings.get_setting("training/random_seed")
-        if not self.features:
+        # Check for samples
+        samples = self.sampleSelectCombo.getCurrentData()
+        if len(samples) == 0:  # add end of src_dir as sample
+            samples = [src_dir.name]
+            src_dir = src_dir.parent
+        # Get splits file
+        splits_file = select_file_folder_dialog(
+            self,
+            "Select Splits File:",
+            False,
+            False,
+            "CSV files (*.csv)",
+            start_dir=str(csv_dir),
+        )
+        if not splits_file or not os.path.isfile(splits_file):
             self.log(
                 "warning",
-                "No labeled features inputed. Please add annotated features above.",
+                "No valid splits file selected.",
             )
             return
+        else:
+            splits_file = Path(splits_file).resolve()
 
         # Setup thread callbacks
         finish_callback = partial(self._on_thread_finish, "Annotations")
-        self.progress_dict["Annotations"] = {"count": 0, "total": 0}
-        # Check for no samples (single directory)
-        if not samples:
-            if not os.path.isdir(src_dir):
+        self.progress_dict["Annotations"] = {"count": 0, "total": len(samples) * 2}
+        # For multi-sample training splits to use multithreading
+        for sample in samples:
+            if not os.path.isdir(src_dir / sample):
                 self.log(
                     "error",
-                    f"Invalid raw directory: {src_dir}.",
+                    f"Invalid raw directory: {src_dir / sample}, skipping sample.",
                 )
-                return
-            self.progress_dict["Annotations"]["total"] = 2
-            sample = src_dir.name
+                continue
             annotation_worker = Worker(
                 partial(
                     add_annotations,
-                    src_dir=src_dir,
-                    dst_dir=src_dir,
-                    annot_dir=annot_dir,
+                    src_dir=src_dir / sample,
+                    dst_dir=src_dir / sample,
+                    annot_dir=annot_dir / sample,
                     csv_file=csv_dir / f"{sample}.csv",
                     features=self.features,
                 )
@@ -601,7 +594,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             split_worker = Worker(
                 partial(
                     add_splits,
-                    dst_dir=csv_dir,
+                    splits_file=splits_file,
                     csv_file=csv_dir / f"{sample}.csv",
                     sample=sample,
                     num_splits=num_splits,
@@ -612,49 +605,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             split_worker.signals.finish.connect(finish_callback)
             annotation_worker.signals.error.connect(self._handle_thread_exception)
             split_worker.signals.error.connect(self._handle_thread_exception)
-            # Run adding annotations and generating splits in parallel
+            # Run both in parallel with all samples for multithreading
             self.threadpool.start(annotation_worker)
             self.threadpool.start(split_worker)
-        else:
-            self.progress_dict["Annotations"]["total"] = len(samples) * 2
-            for sample in samples:
-                if not os.path.isdir(src_dir / sample):
-                    self.log(
-                        "error",
-                        f"Invalid raw directory: {src_dir / sample}, skipping sample.",
-                    )
-                    continue
-                annotation_worker = Worker(
-                    partial(
-                        add_annotations,
-                        src_dir=src_dir / sample,
-                        dst_dir=src_dir / sample,
-                        annot_dir=annot_dir / sample,
-                        csv_file=csv_dir / f"{sample}.csv",
-                        features=self.features,
-                    )
-                )
-                split_worker = Worker(
-                    partial(
-                        add_splits,
-                        dst_dir=csv_dir,
-                        csv_file=csv_dir / f"{sample}.csv",
-                        sample=sample,
-                        num_splits=num_splits,
-                        seed=seed,
-                    )
-                )
-                annotation_worker.signals.finish.connect(finish_callback)
-                split_worker.signals.finish.connect(finish_callback)
-                annotation_worker.signals.error.connect(self._handle_thread_exception)
-                split_worker.signals.error.connect(self._handle_thread_exception)
-                # Run both in parallel with all samples for multithreading
-                self.threadpool.start(annotation_worker)
-                self.threadpool.start(split_worker)
 
     @_catch_exceptions("generate new training splits", concurrent=True)
     def run_new_training_splits(self, *args):
         """Generate new training splits .csv file from existing splits."""
+        # Get kwargs from settings
+        num_splits = self.settings.get_setting("training/num_splits")
+        seed = self.settings.get_setting("training/random_seed")
         # Get directory from settings
         if self.csvDirectory.text():
             csv_dir = Path(self.csvDirectory.text()).resolve()
@@ -664,38 +624,43 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"No CSV directory specified. Please specify a CSV directory.",
             )
             return
-        num_splits = self.settings.get_setting("training/num_splits")
-        seed = self.settings.get_setting("training/random_seed")
 
-        # Get splits file or set it to default value
-        splits_file, ok = QInputDialog.getText(
-            self, "Splits File", "Enter splits file path:"
+        # Get splits file
+        splits_file = select_file_folder_dialog(
+            self,
+            "Select Splits File:",
+            False,
+            False,
+            "CSV files (*.csv)",
+            start_dir=str(csv_dir),
         )
-        if ok and splits_file:
-            splits_file = Path(splits_file).resolve()
-        else:
-            splits_file = csv_dir / "splits.csv"
+        if not splits_file or not os.path.isfile(splits_file):
             self.log(
                 "warning",
-                f"No splits file specified in Settings. Using {splits_file}.",
+                "No valid splits file selected.",
             )
-
+            return
+        else:
+            splits_file = Path(splits_file).resolve()
         # Check to see if new splits replaces old splits
         dst_name, ok = QInputDialog.getText(
-            self, "New Split Name", "Enter new split name:"
+            self, "New Splits File", "Enter new split filename:"
         )
-        if ok and dst_name in [p.stem for p in csv_dir.glob("*.csv")]:
-            result = QMessageBox.warning(
-                self,
-                "Warning!",
-                f"This will overwriting existing splits {dst_name}. Continue?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            )
-            if result == QMessageBox.StandardButton.No:
-                self.log("warning", "New split generation cancelled.")
-                return
-        elif not ok:
-            self.log("warning", f"No split specified. Please specify a split name.")
+        if not ok:
+            return
+        if dst_name:
+            if dst_name in [s.stem for s in csv_dir.glob("*.csv")]:
+                result = QMessageBox.warning(
+                    self,
+                    "Warning!",
+                    f"This will overwriting existing splits {dst_name}. Continue?",
+                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                )
+                if result == QMessageBox.StandardButton.No:
+                    self.log("warning", "New split generation cancelled.")
+                    return
+            dst_file = Path(csv_dir / f"{dst_name}.csv").resolve()
+        else:
             return
 
         # Start thread to generate new splits
@@ -703,7 +668,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         worker = Worker(
             generate_new_splits,
             splits_file,
-            dst_file=csv_dir / f"{dst_name}.csv",
+            dst_file=dst_file,
             num_splits=num_splits,
             seed=seed,
         )
@@ -722,17 +687,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             return
         # Get directories from settings
-        dino_dir = self.settings.get_setting("dino/model_directory")
-        if dino_dir:
-            dino_dir = Path(dino_dir).resolve()
-        else:
-            self.log(
-                "warning",
-                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
-            )
-            return
         if self.dataDirectoryTrain.text():
-            data_dir = Path(self.dataDirectoryTrain.text()).resolve()
+            src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
             return
@@ -741,20 +697,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No CSV directory specified.")
             return
-        if features_dir:
-            features_dir = Path(features_dir).resolve()
-        else:
+        dino_dir = self.settings.get_setting("dino/model_directory")
+        features_dir = self.settings.get_setting("dino/features_directory")
+        if not dino_dir:
+            self.log(
+                "warning",
+                f"Missing DINO directory: {dino_dir}. This is where the DINOv2 model will be saved. Please set it in the settings.",
+            )
+            return
+        if not features_dir:
             self.log(
                 "warning",
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
-            features_dir = data_dir
+            features_dir = src_dir
         dino_batch_size = self.settings.get_setting("dino/batch_size")
 
         # Setup DINOv2 command
         dino_config = DinoFeaturesConfig(
             dino_dir=dino_dir,
-            tomo_dir=data_dir,
+            tomo_dir=src_dir,
             csv_dir=csv_dir,
             feature_dir=features_dir,
             batch_size=dino_batch_size,
@@ -762,25 +724,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         dino_commands = ["-m", "cryovit.dino_features"]
         dino_commands += self._create_command_from_config(
-            dino_config, ["all_samples", "cryovit_root"]
+            dino_config, ignored_config_keys
         )
         dino_commands += ["hydra.mode=RUN"]
-
-        # Setup QProcesses
-        self.dino_process = QProcess()
-        self.dino_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, "dino_process")
-        )
-        self.dino_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, "dino_process")
-        )
-        self.dino_process.stateChanged.connect(
-            partial(self._handle_state_change, "dino_process")
-        )
-        self.dino_process.finished.connect(self._dino_process_finish)
-        self.log("info", f"Running DINO features:")
-        self.log("debug", f"Command: {dino_commands}")
-        self.dino_process.start("python", dino_commands)
+        if self.use_local_training.isChecked():
+            dino_command = "python " + " ".join(dino_commands)
+            # Copy to clipboard
+            pyperclip.copy(dino_command)
+            self.log("info", f"Copied DINO command to clipboard:\n{dino_command}")
+        else:
+            # Setup QProcesses
+            self.dino_process = QProcess()
+            self.dino_process.readyReadStandardOutput.connect(
+                partial(self._handle_stdout, "dino_process")
+            )
+            self.dino_process.readyReadStandardError.connect(
+                partial(self._handle_stderr, "dino_process")
+            )
+            self.dino_process.stateChanged.connect(
+                partial(self._handle_state_change, "dino_process")
+            )
+            self.dino_process.finished.connect(self._dino_process_finish)
+            self.log("info", f"Running DINO features:")
+            self.log("debug", f"Command: {dino_commands}")
+            self.dino_process.start("python", dino_commands)
 
     @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
@@ -792,43 +759,38 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "Cannot run training: Another process is already running.",
             )
             return
-        # Check for required settings
-        model_dir = self.settings.get_setting("model/model_directory")
-        if model_dir:
-            model_dir = Path(model_dir).resolve()
+        # Get directories from settings
+        if self.dataDirectory.text():
+            src_dir = Path(self.dataDirectory.text()).resolve()
         else:
+            self.log("warning", "No data directory specified.")
+            return
+        if self.replaceCheckboxSeg.isChecked():
+            if self.replaceDirectorySeg.text():
+                dst_dir = Path(self.replaceDirectorySeg.text()).resolve()
+            else:
+                self.log("warning", "No replace directory specified.")
+                return
+        else:
+            self.replaceDirectorySeg.setText(str(src_dir))
+            dst_dir = src_dir
+        model_dir = self.settings.get_setting("model/model_directory")
+        features_dir = self.settings.get_setting("dino/features_directory")
+        if not model_dir:
             self.log(
                 "warning",
                 f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
             return
-        if self.dataDirectory.text():
-            data_dir = Path(self.dataDirectory.text()).resolve()
-        else:
-            self.log("warning", "No data directory specified.")
-            return
-
-        # Get directories from settings
-        replace_seg = self.replaceCheckboxSeg.isChecked()
-        replace_seg_dir = self.replaceDirectorySeg.text()
-        dst_dir = Path(data_dir if replace_seg else replace_seg_dir).resolve()
-        features_dir = self.settings.get_setting("dino/features_directory")
-        if features_dir:
-            features_dir = Path(features_dir).resolve()
-        else:
+        if not features_dir:
             self.log(
                 "warning",
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
-            features_dir = data_dir
+            features_dir = src_dir
         batch_size = self.settings.get_setting("segmentation/batch_size")
-        if self.settings.get_setting("segmentation/csv_file"):
-            csv_file = self.settings.get_setting("segmentation/csv_file")
-            csv_file = Path(csv_file).resolve()
-        else:
-            csv_file = None
 
-        # Setup segmentation command
+        ## Setup segmentation command
         # Get model list
         model_names = ",".join(
             [
@@ -837,9 +799,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if self.modelTabs.indexOf(self._models[page]["widget"]) != -1
             ]
         )
-        exp_paths = ExpPaths(
-            exp_dir=dst_dir, tomo_dir=features_dir, split_file=csv_file
-        )
+        exp_paths = ExpPaths(exp_dir=dst_dir, tomo_dir=features_dir, split_file=None)
         dataset_config = Inference()
         infer_config = InferModelConfig(
             models=[],
@@ -851,19 +811,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         infer_commands += ["dataset=inference"]
         infer_commands += self._create_command_from_config(
             infer_config,
-            [
-                "aux_keys",
-                "dataloader",
-                "trainer",
-                "cryovit_root",
-                "logger",
-                "callbacks",
-                "losses",
-                "metrics",
-                "models",
-                "_target_",
-                "_partial_",
-            ],
+            ignored_config_keys + ["trainer"],
         )
         # Add in additional settings
         infer_commands += [
@@ -871,22 +819,29 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             f"models=[{model_names}]",
             "hydra.mode=RUN",
         ]
-
-        # Setup QProcesses
-        self.segment_process = QProcess()
-        self.segment_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, "segment_process")
-        )
-        self.segment_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, "segment_process")
-        )
-        self.segment_process.stateChanged.connect(
-            partial(self._handle_state_change, "segment_process")
-        )
-        self.segment_process.finished.connect(self._segment_process_finish)
-        self.log("info", f"Running segmentation:")
-        self.log("debug", f"Command: {infer_commands}")
-        self.segment_process.start("python", infer_commands)
+        if self.use_local_training.isChecked():
+            infer_command = "python " + " ".join(infer_commands)
+            # Copy to clipboard
+            pyperclip.copy(infer_command)
+            self.log(
+                "info", f"Copied Segmentation command to clipboard:\n{infer_command}"
+            )
+        else:
+            # Setup QProcesses
+            self.segment_process = QProcess()
+            self.segment_process.readyReadStandardOutput.connect(
+                partial(self._handle_stdout, "segment_process")
+            )
+            self.segment_process.readyReadStandardError.connect(
+                partial(self._handle_stderr, "segment_process")
+            )
+            self.segment_process.stateChanged.connect(
+                partial(self._handle_state_change, "segment_process")
+            )
+            self.segment_process.finished.connect(self._segment_process_finish)
+            self.log("info", f"Running segmentation:")
+            self.log("debug", f"Command: {infer_commands}")
+            self.segment_process.start("python", infer_commands)
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
@@ -898,18 +853,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "Cannot run training: Another process is already running.",
             )
             return
-        # Check for required settings
-        model_dir = self.settings.get_setting("model/model_directory")
-        if model_dir:
-            model_dir = Path(model_dir).resolve()
-        else:
+        if not self.train_model_config:
             self.log(
                 "warning",
-                f"Missing model directory: {model_dir}. Please set it in the settings.",
+                "No model selected. Please select a model in the 'Training' section in the 'Train Model' tab.",
             )
             return
+        # Get directories from settings
         if self.dataDirectoryTrain.text():
-            data_dir = Path(self.dataDirectoryTrain.text()).resolve()
+            src_dir = Path(self.dataDirectoryTrain.text()).resolve()
         else:
             self.log("warning", "No data directory specified.")
             return
@@ -918,30 +870,37 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         else:
             self.log("warning", "No CSV directory specified.")
             return
-        if not self.train_model_config:
+        model_dir = self.settings.get_setting("model/model_directory")
+        features_dir = self.settings.get_setting("dino/features_directory")
+        if not model_dir:
             self.log(
                 "warning",
-                "No model selected. Please select a model in the 'Training' section in the 'Train Model' tab.",
+                f"Missing model directory: {model_dir}. Please set it in the settings.",
             )
             return
-
-        # Get directories
-        split_file, ok = QInputDialog.getText(
-            self, "Splits File", "Enter splits file path:"
-        )
-        if ok and split_file:
-            split_file = Path(split_file).resolve()
-        else:
-            split_file = csv_dir / "splits.csv"
-        features_dir = self.settings.get_setting("dino/features_directory")
-        if features_dir:
-            features_dir = Path(features_dir).resolve()
-        else:
+        if not features_dir:
             self.log(
                 "warning",
                 f"No DINO directory specified. This will add DINO features to the input tomograms. If you want to save DINO features separately, please set the features directory in the settings.",
             )
-            features_dir = data_dir
+            features_dir = src_dir
+
+        splits_file = select_file_folder_dialog(
+            self,
+            "Select Splits File:",
+            False,
+            False,
+            "CSV files (*.csv)",
+            start_dir=str(csv_dir),
+        )
+        if not splits_file or not os.path.isfile(splits_file):
+            self.log(
+                "warning",
+                "No valid splits file selected.",
+            )
+            return
+        else:
+            splits_file = Path(splits_file).resolve()
         batch_size = self.settings.get_setting("training/batch_size")
         seed = self.settings.get_setting("training/random_seed")
 
@@ -956,7 +915,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         exp_paths = ExpPaths(
             exp_dir=model_dir / self.train_model_config.name,
             tomo_dir=features_dir,
-            split_file=split_file,
+            split_file=splits_file,
         )
         train_config = TrainModelConfig(
             exp_name=self.train_model_config.name,
@@ -976,19 +935,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ]
         train_commands += self._create_command_from_config(
             train_config,
-            [
-                "aux_keys",
-                "dataloader",
-                "cryovit_root",
-                "test_samples",
-                "split_id",
-                "logger",
-                "callbacks",
-                "losses",
-                "metrics",
-                "_target_",
-                "_partial_",
-            ],
+            ignored_config_keys,
         )
         # Add in additional settings
         train_commands += [
@@ -1002,21 +949,27 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         )
         save_model_config(model_dir, self.train_model_config)
 
-        # Setup QProcesses
-        self.train_process = QProcess()
-        self.train_process.readyReadStandardOutput.connect(
-            partial(self._handle_stdout, "train_process")
-        )
-        self.train_process.readyReadStandardError.connect(
-            partial(self._handle_stderr, "train_process")
-        )
-        self.train_process.stateChanged.connect(
-            partial(self._handle_state_change, "train_process")
-        )
-        self.train_process.finished.connect(self._train_process_finish)
-        self.log("info", f"Running training:")
-        self.log("debug", f"Command: {train_commands}")
-        self.train_process.start("python", train_commands)
+        if self.use_local_training.isChecked():
+            train_command = "python " + " ".join(train_commands)
+            # Copy to clipboard
+            pyperclip.copy(train_command)
+            self.log("info", f"Copied Training command to clipboard:\n{train_command}")
+        else:
+            # Setup QProcesses
+            self.train_process = QProcess()
+            self.train_process.readyReadStandardOutput.connect(
+                partial(self._handle_stdout, "train_process")
+            )
+            self.train_process.readyReadStandardError.connect(
+                partial(self._handle_stderr, "train_process")
+            )
+            self.train_process.stateChanged.connect(
+                partial(self._handle_state_change, "train_process")
+            )
+            self.train_process.finished.connect(self._train_process_finish)
+            self.log("info", f"Running training:")
+            self.log("debug", f"Command: {train_commands}")
+            self.train_process.start("python", train_commands)
 
     def _create_command_from_config(self, config, excluded_keys: str = []) -> List[str]:
         """Create a command recursively from the config dataclass."""
@@ -1076,12 +1029,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.replaceSelectProc,
         )
         self._show_hide_widgets(
-            not self.replaceCheckboxProcTrain.isChecked(),
-            self.replaceDirectoryLabelProcTrain,
-            self.replaceDirectoryProcTrain,
-            self.replaceSelectProcTrain,
-        )
-        self._show_hide_widgets(
             not self.replaceCheckboxSeg.isChecked(),
             self.replaceDirectoryLabelSeg,
             self.replaceDirectorySeg,
@@ -1094,14 +1041,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 self.replaceDirectoryLabelProc,
                 self.replaceDirectoryProc,
                 self.replaceSelectProc,
-            )
-        )
-        self.replaceCheckboxProcTrain.checkStateChanged.connect(
-            lambda state: self._show_hide_widgets(
-                state == Qt.CheckState.Unchecked,
-                self.replaceDirectoryLabelProcTrain,
-                self.replaceDirectoryProcTrain,
-                self.replaceSelectProcTrain,
             )
         )
         self.replaceCheckboxSeg.checkStateChanged.connect(
@@ -1168,9 +1107,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             )
             return
         model_dir = self.settings.get_setting("model/model_directory")
-        if model_dir:
-            model_dir = Path(model_dir).resolve()
-        else:
+        if not model_dir:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1258,9 +1195,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.modelTabs.setCurrentIndex(index)
             return
         model_dir = self.settings.get_setting("model/model_directory")
-        if model_dir:
-            model_dir = Path(model_dir).resolve()
-        else:
+        if not model_dir:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1287,9 +1222,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _import_model(self, *args):
         """Import a new model(s) from a file."""
         model_dir = self.settings.get_setting("model/model_directory")
-        if model_dir:
-            model_dir = Path(model_dir).resolve()
-        else:
+        if not model_dir:
             self.log(
                 "error",
                 f"Invalid model directory: {model_dir}. Please set it in the settings.",
@@ -1300,7 +1233,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select model file(s):",
             False,
             True,
-            file_types=[".pt", ".pth"],
+            file_types="Model files (*.pt, *.pth)",
             start_dir=str(model_dir),
         )
         # Check for empty selection
@@ -1343,28 +1276,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 False,
             )
         )
-        self.rawSelectTrain.clicked.connect(
-            partial(
-                self._file_directory_prompt,
-                self.rawDirectoryTrain,
-                "raw tomogram",
-                True,
-                False,
-            )
-        )
         self.dataSelect.clicked.connect(
             partial(
                 self._file_directory_prompt,
                 self.dataDirectory,
-                "processed tomogram",
-                True,
-                False,
-            )
-        )
-        self.dataSelectTrain.clicked.connect(
-            partial(
-                self._file_directory_prompt,
-                self.dataDirectoryTrain,
                 "processed tomogram",
                 True,
                 False,
@@ -1406,15 +1321,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 False,
             )
         )
-        self.replaceSelectProcTrain.clicked.connect(
-            partial(
-                self._file_directory_prompt,
-                self.replaceDirectoryProcTrain,
-                "new processed",
-                True,
-                False,
-            )
-        )
         self.replaceSelectSeg.clicked.connect(
             partial(
                 self._file_directory_prompt,
@@ -1429,9 +1335,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.rawDirectory.editingFinished.connect(
             partial(self._update_file_directory_field, self.rawDirectory, True)
         )
-        self.rawDirectoryTrain.editingFinished.connect(
-            partial(self._update_file_directory_field, self.rawDirectoryTrain, True)
-        )
         self.csvDirectory.editingFinished.connect(
             partial(self._update_file_directory_field, self.csvDirectory, True)
         )
@@ -1445,13 +1348,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             partial(
                 self._update_file_directory_field,
                 self.replaceDirectoryProc,
-                True,
-            )
-        )
-        self.replaceDirectoryProcTrain.editingFinished.connect(
-            partial(
-                self._update_file_directory_field,
-                self.replaceDirectoryProcTrain,
                 True,
             )
         )
@@ -1474,7 +1370,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Select {name} {'directory' if is_folder else 'file'}:",
                 is_folder,
                 is_multiple,
-                start_dir=(self.settings.get_setting("general/data_directory")),
+                start_dir=str(self.settings.get_setting("general/data_directory")),
             )
         )
 
@@ -1600,7 +1496,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if config_dialog.result() == config_dialog.DialogCode.Accepted:
             self.train_model_config = config_dialog.config
             self.train_model_config.model_weights = (
-                Path(self.settings.get_setting("model/model_directory"))
+                self.settings.get_setting("model/model_directory")
                 / self.train_model_config.name
                 / "weights.pt"
             )
@@ -1611,8 +1507,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def setup_run_buttons(self):
         """Setup the run buttons for processing and training."""
-        self.processButtonSeg.clicked.connect(partial(self.run_preprocessing, False))
-        self.processButtonTrain.clicked.connect(partial(self.run_preprocessing, True))
+        self.processButtonSeg.clicked.connect(self.run_preprocessing)
         self.chimeraButton.clicked.connect(self.run_chimerax)
         self.splitsButton.clicked.connect(self.run_generate_training_splits)
         self.splitsButtonNew.clicked.connect(self.run_new_training_splits)
@@ -1629,6 +1524,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionSettings.triggered.connect(self._open_settings)
 
         self.actionDirectory_Setup.triggered.connect(self._setup_directory)
+        self.actionGenerate_New_Training_Splits.triggered.connect(
+            self.run_new_training_splits
+        )
 
         self.actionGithub.triggered.connect(
             lambda: QDesktopServices.openUrl(
@@ -1640,11 +1538,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _load_preset(self, *args):
         """Opens a prompt to optionally load previous settings from a saved name."""
         available_presets = (
-            sorted(
-                [name for name in self.settings.get_setting("preset/available_presets")]
-            )
-            if self.settings.get_setting("preset/available_presets")
-            else []
+            sorted(self.settings.get_setting("preset/available_presets")) or []
         )
         if not available_presets:
             self.log("warning", "No available presets to load.")
@@ -1697,9 +1591,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 return
         else:
             current_presets = (
-                self.settings.get_setting("preset/available_presets")
-                if self.settings.get_setting("preset/available_presets")
-                else []
+                self.settings.get_setting("preset/available_presets") or []
             )
             preset_dialog = PresetDialog(
                 self,
@@ -1738,7 +1630,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 for key in self.settings.get_available_settings()
                 if not key.startswith("preset/")
             ]:
-                temp_settings.setValue(key, self.settings.get_setting(key))
+                temp_settings.setValue(key, self.settings.get_setting(key, as_str=True))
             self.settings.set_setting("preset/current_preset", name)
             self.log("success", f"Saved preset: {name}")
 
@@ -1755,7 +1647,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Open file dialogs to setup a data directory for downloaded datasets."""
         # Get the directory where datasets are downloaded
         src_dir = select_file_folder_dialog(
-            self, "Select downloaded dataset base directory:", True, False
+            self,
+            "Select downloaded dataset base directory:",
+            True,
+            False,
+            start_dir=str(self.settings.get_setting("general/data_directory")),
         )
         if not src_dir or not os.path.isdir(src_dir):
             self.log("warning", "No valid directory selected.")
@@ -1790,7 +1686,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Get the directory where raw tomograms are stored
         data_dir = select_file_folder_dialog(
-            self, "Select raw tomogram base directory:", True, False
+            self,
+            "Select raw tomogram base directory:",
+            True,
+            False,
+            start_dir=str(self.settings.get_setting("general/data_directory")),
         )
         if not data_dir or not os.path.isdir(data_dir):
             self.log("warning", "No valid directory selected.")
