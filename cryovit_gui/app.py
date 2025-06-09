@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 import shutil
+import psutil
 import sys
 from functools import partial
 from dataclasses import is_dataclass, fields
@@ -64,6 +65,14 @@ from cryovit_gui.config import (
     tomogram_exts,
 )
 from cryovit_gui.processing import *
+
+## Setup logging ##
+import logging
+import json
+
+logging.config.dictConfig(json.load("logging.conf"))
+logger = logging.getLogger("cryovit")
+debug_logger = logging.getLogger("debug")
 
 
 class WorkerSignals(QObject):
@@ -214,16 +223,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             SettingsWindow.reset_settings()
             self.settings = SettingsWindow(self)
         # Setup thread pool and processes
-        self.threadpool: QThreadPool = (
-            QThreadPool.globalInstance()
-            if QThreadPool.globalInstance()
-            else QThreadPool()
-        )
+        # Limit threads based on memory, assuming 5 GB per thread
+        thread_count = max(1, psutil.virtual_memory().available // (5 * 10 ^ 9))
+        self.threadpool: QThreadPool = QThreadPool(thread_count=thread_count)
         self.progress_dict = {}  # progress bar update dict
         self.chimera_process = None
-        self.dino_process = None
-        self.segment_process = None
-        self.train_process = None
 
         # Setup UI elements
         try:
@@ -628,73 +632,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.threadpool.start(annotation_worker)
             self.threadpool.start(split_worker)
 
-    @_catch_exceptions("generate new training splits", concurrent=True)
-    def run_new_training_splits(self, *args):
-        """Generate new training splits .csv file from existing splits."""
-        # Get kwargs from settings
-        num_splits = self.settings.get_setting("training/num_splits")
-        seed = self.settings.get_setting("training/random_seed")
-        # Get directory from settings
-        if self.csvDirectory.text():
-            csv_dir = Path(self.csvDirectory.text()).resolve()
-        else:
-            self.log(
-                "warning",
-                f"No CSV directory specified. Please specify a CSV directory.",
-            )
-            return
-
-        # Get splits file
-        splits_file = select_file_folder_dialog(
-            self,
-            "Select Splits File:",
-            False,
-            False,
-            "CSV files (*.csv)",
-            start_dir=str(csv_dir),
-        )
-        if not splits_file or not os.path.isfile(splits_file):
-            self.log(
-                "warning",
-                "No valid splits file selected.",
-            )
-            return
-        else:
-            splits_file = Path(splits_file).resolve()
-        # Check to see if new splits replaces old splits
-        dst_name, ok = QInputDialog.getText(
-            self, "New Splits File", "Enter new split filename:"
-        )
-        if not ok:
-            return
-        if dst_name:
-            if dst_name in [s.stem for s in csv_dir.glob("*.csv")]:
-                result = QMessageBox.warning(
-                    self,
-                    "Warning!",
-                    f"This will overwriting existing splits {dst_name}. Continue?",
-                    QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                )
-                if result == QMessageBox.StandardButton.No:
-                    self.log("warning", "New split generation cancelled.")
-                    return
-            dst_file = Path(csv_dir / f"{dst_name}.csv").resolve()
-        else:
-            return
-
-        # Start thread to generate new splits
-        finish_callback = partial(self._on_thread_finish, "New Splits")
-        worker = Worker(
-            generate_new_splits,
-            splits_file,
-            dst_file=dst_file,
-            num_splits=num_splits,
-            seed=seed,
-        )
-        worker.signals.finish.connect(finish_callback)
-        worker.signals.error.connect(self._handle_thread_exception)
-        self.threadpool.start(worker)
-
     @_catch_exceptions("feature extraction", concurrent=True)
     def run_feature_extraction(self, *args):
         """Calculate DINO features for tomograms."""
@@ -746,27 +683,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             dino_config, ignored_config_keys
         )
         dino_commands += ["hydra.mode=RUN"]
-        if self.use_local_training.isChecked():
-            dino_command = "python " + " ".join(dino_commands)
-            # Copy to clipboard
-            pyperclip.copy(dino_command)
-            self.log("info", f"Copied DINO command to clipboard:\n{dino_command}")
-        else:
-            # Setup QProcesses
-            self.dino_process = QProcess()
-            self.dino_process.readyReadStandardOutput.connect(
-                partial(self._handle_stdout, "dino_process")
-            )
-            self.dino_process.readyReadStandardError.connect(
-                partial(self._handle_stderr, "dino_process")
-            )
-            self.dino_process.stateChanged.connect(
-                partial(self._handle_state_change, "dino_process")
-            )
-            self.dino_process.finished.connect(self._dino_process_finish)
-            self.log("info", f"Running DINO features:")
-            self.log("debug", f"Command: {dino_commands}")
-            self.dino_process.start("python", dino_commands)
+        dino_command = "python " + " ".join(dino_commands)
+        # Copy to clipboard
+        pyperclip.copy(dino_command)
+        self.log("info", f"Copied DINO command to clipboard:\n{dino_command}")
 
     @_catch_exceptions("segmentation", concurrent=True)
     def run_segmentation(self, *args):
@@ -838,29 +758,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             f"models=[{model_names}]",
             "hydra.mode=RUN",
         ]
-        if self.use_local_training.isChecked():
-            infer_command = "python " + " ".join(infer_commands)
-            # Copy to clipboard
-            pyperclip.copy(infer_command)
-            self.log(
-                "info", f"Copied Segmentation command to clipboard:\n{infer_command}"
-            )
-        else:
-            # Setup QProcesses
-            self.segment_process = QProcess()
-            self.segment_process.readyReadStandardOutput.connect(
-                partial(self._handle_stdout, "segment_process")
-            )
-            self.segment_process.readyReadStandardError.connect(
-                partial(self._handle_stderr, "segment_process")
-            )
-            self.segment_process.stateChanged.connect(
-                partial(self._handle_state_change, "segment_process")
-            )
-            self.segment_process.finished.connect(self._segment_process_finish)
-            self.log("info", f"Running segmentation:")
-            self.log("debug", f"Command: {infer_commands}")
-            self.segment_process.start("python", infer_commands)
+        infer_command = "python " + " ".join(infer_commands)
+        # Copy to clipboard
+        pyperclip.copy(infer_command)
+        self.log("info", f"Copied Segmentation command to clipboard:\n{infer_command}")
 
     @_catch_exceptions("training", concurrent=True)
     def run_training(self, *args):
@@ -924,7 +825,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         seed = self.settings.get_setting("training/random_seed")
 
         # Setup training command
-        model_name, model_config = load_base_model_config(self.train_model_config)
+        model_name, model_config = self.train_model_config
         if len(self.train_model_config.samples) > 1:
             dataset_config = MultiSample(sample=self.train_model_config.samples)
             dataset_name = "multi"
@@ -966,29 +867,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.train_model_config.model_weights = (
             Path(exp_paths.exp_dir) / self.train_model_config.name / "weights.pt"
         )
-        save_model_config(model_dir, self.train_model_config)
 
-        if self.use_local_training.isChecked():
-            train_command = "python " + " ".join(train_commands)
-            # Copy to clipboard
-            pyperclip.copy(train_command)
-            self.log("info", f"Copied Training command to clipboard:\n{train_command}")
-        else:
-            # Setup QProcesses
-            self.train_process = QProcess()
-            self.train_process.readyReadStandardOutput.connect(
-                partial(self._handle_stdout, "train_process")
-            )
-            self.train_process.readyReadStandardError.connect(
-                partial(self._handle_stderr, "train_process")
-            )
-            self.train_process.stateChanged.connect(
-                partial(self._handle_state_change, "train_process")
-            )
-            self.train_process.finished.connect(self._train_process_finish)
-            self.log("info", f"Running training:")
-            self.log("debug", f"Command: {train_commands}")
-            self.train_process.start("python", train_commands)
+        train_command = "python " + " ".join(train_commands)
+        # Copy to clipboard
+        pyperclip.copy(train_command)
+        self.log("info", f"Copied Training command to clipboard:\n{train_command}")
 
     def _create_command_from_config(self, config, excluded_keys: str = []) -> List[str]:
         """Create a command recursively from the config dataclass."""
@@ -1017,21 +900,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             else:
                 dino_commands += [f"{f.name}={getattr(config, f.name)}"]
         return dino_commands
-
-    def _dino_process_finish(self, *args):
-        self.log("success", "DINO features complete. Running model...")
-        self.dino_process = None
-        QGuiApplication.restoreOverrideCursor()
-
-    def _segment_process_finish(self, *args):
-        self.log("success", "Segmentation complete.")
-        self.segment_process = None
-        QGuiApplication.restoreOverrideCursor()
-
-    def _train_process_finish(self, *args):
-        self.log("success", "Training complete.")
-        self.train_process = None
-        QGuiApplication.restoreOverrideCursor()
 
     def setup_console(self):
         """Setup the UI console to display stdout and stderr messages."""
@@ -1093,195 +961,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def _add_sample(self, *args):
         """Add a new sample to the sample list."""
         self.sampleSelectCombo.addNewItem()
-
-    def setup_model_select(self):
-        """Setup model architecture selection for training."""
-        # Setup model cache
-        self._models = {}
-        # Get available models from settings
-        model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir or not os.path.isdir(model_dir):
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return
-        available_models = get_available_models(Path(model_dir))
-        self.modelCombo.addItems(available_models)
-        self.modelCombo.currentIndexChanged.connect(self._update_current_model_info)
-        self.modelCombo.setCurrentIndex(0)
-        # Setup model buttons
-        self.addModelButton.clicked.connect(self._add_model)
-        self.removeModelButton.clicked.connect(self._remove_model)
-        self.importModelButton.clicked.connect(self._import_model)
-
-    @_catch_exceptions("update current model info")
-    def _update_current_model_info(self, *args):
-        """Update the current model info based on the selected model."""
-        model_name = self.modelCombo.currentText()
-        # Check for cache
-        if model_name in self._models:
-            self.selectedModelArea.setWidget(
-                self._models[model_name]["widget"].widget()
-            )
-            return
-        model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return
-        model_config = get_model_configs(model_dir, [model_name])[0]
-        self.selectedModelArea.setWidget(
-            self._create_model_scroll(model_name, model_config).widget()
-        )
-
-    def _create_model_scroll(
-        self, model_name: str, model_config: InterfaceModelConfig
-    ) -> QWidget:
-        """Update the model scroll area with the current model config."""
-        scroll = QScrollArea()
-        contents = QWidget()
-        form_layout = QFormLayout(contents)
-        form_layout.setWidget(
-            0,
-            QFormLayout.ItemRole.LabelRole,
-            QLabel(parent=contents, text="Model Name:"),
-        )
-        form_layout.setWidget(
-            0,
-            QFormLayout.ItemRole.FieldRole,
-            QLabel(parent=contents, text=model_config.name),
-        )
-        form_layout.setWidget(
-            1,
-            QFormLayout.ItemRole.LabelRole,
-            QLabel(parent=contents, text="Model Architecture:"),
-        )
-        form_layout.setWidget(
-            1,
-            QFormLayout.ItemRole.FieldRole,
-            QLabel(parent=contents, text=model_config.model_type.value),
-        )
-        form_layout.setWidget(
-            2,
-            QFormLayout.ItemRole.LabelRole,
-            QLabel(parent=contents, text="Dataset Samples:"),
-        )
-        form_layout.setWidget(
-            2,
-            QFormLayout.ItemRole.FieldRole,
-            QLabel(
-                parent=contents,
-                text=(
-                    "".join(model_config.samples)
-                    if len(model_config.samples) < 2
-                    else ", ".join(model_config.samples)
-                ),
-            ),
-        )
-        form_layout.setWidget(
-            3,
-            QFormLayout.ItemRole.LabelRole,
-            QLabel(parent=contents, text="Segmentation Label:"),
-        )
-        form_layout.setWidget(
-            3,
-            QFormLayout.ItemRole.FieldRole,
-            QLabel(parent=contents, text=model_config.label_key),
-        )
-        scroll.setWidget(contents)
-        # Update cache
-        self._models[model_name] = {
-            "widget": scroll,
-            "config": model_config,
-        }
-        # Add scroll to self
-        setattr(self, f"{model_name}Contents", contents)
-        setattr(self, f"{model_name}Scroll", scroll)
-        return scroll
-
-    @_catch_exceptions("add segmentation model")
-    def _add_model(self, *args):
-        """Add a new model to the model list."""
-        model_name = self.modelCombo.currentText()
-        # Check for cache
-        if model_name in self._models:
-            index = self.modelTabs.addTab(
-                self._models[model_name]["widget"], model_name
-            )
-            self.modelTabs.setCurrentIndex(index)
-            return
-        model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return
-        model_config = get_model_configs(model_dir, [model_name])[0]
-        index = self.modelTabs.addTab(
-            self._create_model_scroll(model_name, model_config), model_name
-        )
-        self.modelTabs.setCurrentIndex(index)
-        self.log("success", f"Added model: {model_name}")
-
-    @_catch_exceptions("remove segmentation model")
-    def _remove_model(self, *args):
-        """Remove the selected model from the model list."""
-        model_name = self.modelCombo.currentText()
-        if model_name:
-            self.modelTabs.removeTab(self.modelTabs.currentIndex())
-            self.log("success", f"Removed model: {model_name}")
-        else:
-            self.log("warning", "No model selected to remove.")
-
-    @_catch_exceptions("import segmentation model")
-    def _import_model(self, *args):
-        """Import a new model(s) from a file."""
-        model_dir = self.settings.get_setting("model/model_directory")
-        if not model_dir:
-            self.log(
-                "error",
-                f"Invalid model directory: {model_dir}. Please set it in the settings.",
-            )
-            return
-        model_paths = select_file_folder_dialog(
-            self,
-            "Select model file(s):",
-            False,
-            True,
-            file_types="Model files (*.pt, *.pth)",
-            start_dir=str(model_dir),
-        )
-        # Check for empty selection
-        if not model_paths:
-            return
-        for model_path in model_paths:
-            # Ask user for config
-            model_name = os.path.basename(model_path)
-            model_config = InterfaceModelConfig(
-                model_name, "", ModelArch.CRYOVIT, Path(model_path), {}, []
-            )
-            config_dialog = ModelDialog(self, model_config)
-            result = config_dialog.exec()
-            if result == config_dialog.DialogCode.Rejected:
-                self.log("info", f"Skipping import for model {model_name}.")
-                continue
-            model_config = config_dialog.config
-            # Save config to disk
-            save_model_config(model_dir, model_config)
-            # Add model to list
-            self.modelCombo.addItem(model_name)
-            self.modelCombo.setCurrentText(model_name)
-            index = self.modelTabs.addTab(
-                self._create_model_scroll(model_name, model_config), model_name
-            )
-            self.modelTabs.setCurrentIndex(index)
-            self.log("success", f"Imported model: {model_name}")
-        else:
-            self.log("warning", "No model file selected.")
 
     def setup_folder_selects(self):
         """Setup tool buttons for opening folder and file select dialogs."""
@@ -1807,6 +1486,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Override close event to save settings."""
         self.settings.save_settings()
         event.accept()
+
+
+def filter_maker(level):
+    level = getattr(logging, level)
+
+    def filter(record):
+        return record.levelno <= level
+
+    return filter
 
 
 if __name__ == "__main__":

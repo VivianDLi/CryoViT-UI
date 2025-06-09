@@ -25,20 +25,13 @@ import cryovit_gui.resources
 from cryovit_gui.layouts.settingswindow import Ui_SettingsWindow
 from config import BaseSetting, Settings, SettingField, SettingsInputType
 from utils import select_file_folder_dialog
-from ..gui.clickable_line import ClickableLineEdit
+from .clickable_line import ClickableLineEdit
 
 logger = logging.getLogger(__name__)
 
 
 class SettingsWindow(QDialog, Ui_SettingsWindow):
     """A freestanding dialog window for viewing and editing current settings (e.g., file/folder locations, DINOv2 feature settings)."""
-
-    @staticmethod
-    def reset_settings():
-        """Reset the settings to the default values."""
-        settings = QSettings("Stanford University_Wah Chiu", "CryoViT")
-        settings.clear()
-        settings.sync()
 
     def __init__(self, parent):
         super().__init__(parent)
