@@ -157,22 +157,37 @@ color: rgb(20, 20, 20);</string>
            <string>Annotations</string>
           </property>
           <layout class="QGridLayout" name="gridLayout">
-           <item row="5" column="3">
-            <widget class="QToolButton" name="featuresButton">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+           <item row="2" column="4">
+            <widget class="QPushButton" name="deselectAllButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
              </property>
              <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
+              <string>Deselect All</string>
              </property>
             </widget>
            </item>
-           <item row="3" column="0" colspan="2">
-            <widget class="QPushButton" name="chimeraButton_2">
+           <item row="6" column="0">
+            <widget class="QLabel" name="featuresLabel">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Labeled Features:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="4" column="0" colspan="2">
+            <widget class="QPushButton" name="chimeraButton">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
                <horstretch>0</horstretch>
@@ -187,7 +202,7 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
-               <pointsize>10</pointsize>
+               <pointsize>13</pointsize>
               </font>
              </property>
              <property name="toolTip">
@@ -198,14 +213,14 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
-           <item row="4" column="0" colspan="4">
+           <item row="5" column="0" colspan="6">
             <widget class="Line" name="line">
              <property name="orientation">
               <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
-           <item row="6" column="0" colspan="4">
+           <item row="7" column="0" colspan="6">
             <widget class="QPushButton" name="annotButton">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
@@ -227,33 +242,56 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="0" colspan="4">
-            <widget class="QTableView" name="sampleView">
+           <item row="0" column="0">
+            <widget class="QLabel" name="selectLabel">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>File Selection Progress:</string>
+             </property>
+            </widget>
+           </item>
+           <item row="6" column="1" colspan="2">
+            <widget class="QLineEdit" name="featuresDisplay">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="placeholderText">
+              <string>list features labeled in order of decreasing annotation value</string>
+             </property>
+            </widget>
+           </item>
+           <item row="3" column="0" colspan="6">
+            <widget class="QTableView" name="fileView">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
             </widget>
            </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="featuresLabel">
+           <item row="2" column="3">
+            <widget class="QPushButton" name="selectAllButton">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
              <property name="text">
-              <string>Labeled Features:</string>
+              <string>Select All</string>
              </property>
             </widget>
            </item>
-           <item row="3" column="2" colspan="2">
+           <item row="4" column="3" colspan="3">
             <widget class="QPushButton" name="slicesButton">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
@@ -275,49 +313,68 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
-           <item row="5" column="1" colspan="2">
-            <widget class="QLineEdit" name="featuresDisplay">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="placeholderText">
-              <string>list features labeled in order of decreasing annotation value</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0" colspan="4">
-            <widget class="QTableView" name="fileView">
+           <item row="1" column="0" colspan="6">
+            <widget class="QTableView" name="sampleView">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
-             <property name="minimumSize">
-              <size>
-               <width>0</width>
-               <height>0</height>
-              </size>
+            </widget>
+           </item>
+           <item row="6" column="5">
+            <widget class="QToolButton" name="featuresButton">
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="icon">
+              <iconset resource="resources.qrc">
+               <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
              </property>
             </widget>
            </item>
-           <item row="0" column="3">
+           <item row="2" column="5">
+            <widget class="QPushButton" name="resetDefaultButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="text">
+              <string>Reset to Default</string>
+             </property>
+            </widget>
+           </item>
+           <item row="0" column="1">
             <widget class="QLabel" name="syncIcon">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+             <property name="layoutDirection">
+              <enum>Qt::LayoutDirection::LeftToRight</enum>
+             </property>
              <property name="text">
               <string/>
              </property>
              <property name="textFormat">
               <enum>Qt::TextFormat::PlainText</enum>
              </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="selectLabel">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>File Selection Progress:</string>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
              </property>
             </widget>
            </item>
@@ -352,7 +409,7 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
-               <pointsize>10</pointsize>
+               <pointsize>13</pointsize>
               </font>
              </property>
              <property name="toolTip">
@@ -559,7 +616,7 @@ border-color: rgb(90, 90, 90);</string>
      <x>0</x>
      <y>0</y>
      <width>969</width>
-     <height>21</height>
+     <height>37</height>
     </rect>
    </property>
    <property name="autoFillBackground">

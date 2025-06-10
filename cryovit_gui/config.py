@@ -38,9 +38,22 @@ class ConfigInputType(Flag):
 
 
 ConfigKey = List[str]
+class SampleData(TypedDict):
+    tomogram_files: List[Path]
+    annotated: List[bool]
+    selected: List[bool]
+    exported: List[bool]
+
+
+FileData = Dict[str, SampleData]
 
 tomogram_exts = [".rec", ".mrc", ".hdf"]
 
+# CryoViT commands
+preprocess_command = "cryovit.preprocess"
+train_command = "cryovit.train_model"
+evaluate_command = "cryovit.evaluate_model"
+inference_command = "cryovit.segment_model"
 
 #### Config Dataclasses ####
 
@@ -236,3 +249,15 @@ class ConfigGroup:
             logger.warning(
                 f"Setting {key} is not a valid ConfigField and cannot be set."
             )
+
+    def save_config(self, path: Path) -> None:
+        """Save the configuration to a file."""
+        try:
+            with open(path, "w") as f:
+                for field in self.get_fields(recursive=True):
+                    config_field = self.get_field(field)
+                    if isinstance(config_field, ConfigField):
+                        f.write(f"{field}: {config_field.get_value_as_str()}\n")
+        except Exception as e:
+            logger.error(f"Failed to save config to {path}: {e}")
+            debug_logger.error(f"Failed to save config to {path}: {e}", exc_info=True)

@@ -35,6 +35,24 @@ class ConfigModel(QAbstractItemModel):
             return None
         return target_config
 
+    def get_config_by_key(self, key: ConfigKey) -> ConfigField | ConfigGroup:
+        """Get the ConfigField or ConfigGroup by its key."""
+        target_config = self._data.get_field(key)
+        if target_config is None:
+            logger.warning(f"Config with key {key} not found.")
+            return None
+        return target_config
+
+    def generate_commands(self) -> List[str]:
+        """Generate a list of commands based on the current configuration."""
+        commands = []
+        for key in self._data.get_fields(recursive=True):
+            field = self._data.get_field(key)
+            command_name = ".".join(key)
+            command_value = field.get_value_as_str()
+            commands.append(f"{command_name}={command_value}")
+        return commands
+
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Return the item flags for the given index."""
         if not index.isValid():

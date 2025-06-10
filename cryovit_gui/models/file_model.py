@@ -32,7 +32,7 @@ class FileModel(QAbstractTableModel):
         super().__init__(*args, **kwargs)
         self._root_dir = root_dir
         self._required_subdirs = ["tomograms", "csv", "slices"]
-        self._data = {}
+        self._data: FileData = {}
         self._colors = [
             QColor(*Colors.RED),
             QColor(*Colors.DARK_ORANGE),
@@ -40,7 +40,8 @@ class FileModel(QAbstractTableModel):
             QColor(*Colors.YELLOW),
         ]
         if self.validate_root():
-            self.update_data()
+            data = self.read_data()
+            self.update_data(data, update_selection=True)
 
     def validate_root(self) -> bool:
         """Validate the root directory, returning True if the root directory has the correct structure (i.e., contains tomograms, csv, and slices subfolders), and False if not."""
@@ -58,16 +59,17 @@ class FileModel(QAbstractTableModel):
             setattr(self, f"_{subdir}_dir", self._root_dir / subdir)
         return True
 
-    def update_data(self, update_selection: bool = False) -> None:
-        """Update the model data based on the current root directory."""
+    def read_data(self) -> FileData:
+        """Get model data based on the current root directory."""
         if not self.validate_data():
-            return
+            return {}
         # Get available tomogram files
         samples = [
             sample_dir.name
             for sample_dir in self._root_dir.iterdir()
             if sample.is_dir()
         ]
+        data: FileData = {}
         for sample in samples:
             # Get tomogram files
             sample_dir = self._tomograms_dir / sample
@@ -83,14 +85,14 @@ class FileModel(QAbstractTableModel):
             else:
                 sample_df = pd.read_csv(sample_csv)
                 annotated = [
-                    not sample_df[sample_df["filename"] == file.name].empty
+                    not sample_df[sample_df["tomo_name"] == file.name].empty
                     for file in tomogram_files
                 ]
             if update_selection:
                 selected = annotated.copy()
             else:
                 selected = (
-                    self._data[sample]["selected"]
+                    self._data[sample].selected
                     if sample in self._data
                     else annotated.copy()
                 )
@@ -100,12 +102,26 @@ class FileModel(QAbstractTableModel):
                 bool(list(export_dir.glob(f"*{file.stem}*")) for file in tomogram_files)
             ]
             # Update the model data
-            self._data[sample] = {
-                "tomogram_files": tomogram_files,
-                "annotated": annotated,
-                "selected": selected,
-                "exported": exported,
-            }
+            data[sample] = SampleData(
+                tomogram_files=tomogram_files,
+                annotated=annotated,
+                selected=selected,
+                exported=exported,
+            )
+        return data
+
+    def update_data(data: FileData, update_selection: bool = False) -> None:
+        """Update the model data with the given data."""
+        for sample in data:
+            if update_selection:
+                data[sample].selected = data[sample].annotated.copy()
+            else:
+                data[sample].selected = (
+                    self._data[sample].selected.copy()
+                    if sample in self._data
+                    else data[sample].annotated.copy()
+                )
+        self._data = data
         self.dataChanged.emit(
             self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1)
         )
@@ -115,7 +131,20 @@ class FileModel(QAbstractTableModel):
         self._root_dir = root_dir
         if self.validate_root():
             logger.info(f"Setting root directory to {self._root_dir}")
-            self.update_data()
+            data = self.read_data()
+            self.update_data(data, update_selection=True)
+
+    def get_directory(self, subdir: str) -> Path:
+        """Get the directory for the given subdirectory."""
+        if not self.validate_root():
+            logger.warning(
+                f"Root directory {self._root_dir} is not valid. Cannot get subdirectory {subdir}."
+            )
+            return None
+        if subdir not in self._required_subdirs:
+            logger.warning(f"Subdirectory {subdir} is not a required subdirectory.")
+            return None
+        return getattr(self, f"_{subdir}_dir", None)
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Return the item flags for the given index."""
@@ -136,7 +165,7 @@ class FileModel(QAbstractTableModel):
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the number of rows in the table."""
-        rows = [len(self._data[sample]["tomogram_files"]) for sample in self._data]
+        rows = [len(self._data[sample].tomogram_files) for sample in self._data]
         return sum(rows) if rows else 0
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
@@ -146,8 +175,8 @@ class FileModel(QAbstractTableModel):
     def data(self, index: QModelIndex, role: int) -> QVariant | QBrush | Qt.CheckState:
         """Return the data for the given index and role."""
         sample, tomogram_index = self._get_data(index)
-        samples_annotated = sum(self._data[sample]["annotated"])
-        total_samples = len(self._data[sample]["tomogram_files"])
+        samples_annotated = sum(self._data[sample].annotated)
+        total_samples = len(self._data[sample].tomogram_files)
         percentage = round((samples_annotated / total_samples) * 100, 2)
         background_color = (
             self._colors[percentage // (100 // len(self._colors))]
@@ -181,17 +210,17 @@ class FileModel(QAbstractTableModel):
                 match role:
                     case Qt.ItemDataRole.DisplayRole:
                         return QVariant(
-                            self._data[sample]["tomogram_files"][tomogram_index].name
+                            self._data[sample].tomogram_files[tomogram_index].name
                         )
                     case Qt.ItemDataRole.BackgroundRole:
-                        if self._data[sample]["annotated"][tomogram_index]:
+                        if self._data[sample].annotated[tomogram_index]:
                             return QBrush(
                                 QColor(*Colors.GREEN), style=Qt.BrushStyle.Dense6Pattern
                             )
                     case Qt.ItemDataRole.CheckStateRole:
                         return (
                             Qt.CheckState.Checked
-                            if self._data[sample]["selected"][tomogram_index]
+                            if self._data[sample].selected[tomogram_index]
                             else Qt.CheckState.Unchecked
                         )
                     case _:
@@ -201,13 +230,35 @@ class FileModel(QAbstractTableModel):
                     case Qt.ItemDataRole.DecorationRole:
                         return (
                             QBrush(QColor(*Colors.GREEN))
-                            if self._data[sample]["exported"][tomogram_index]
+                            if self._data[sample].exported[tomogram_index]
                             else QBrush(QColor(*Colors.RED))
                         )
                     case _:
                         return QVariant()
             case _:
                 return QVariant()
+
+    def setData(
+        self,
+        index: QModelIndex,
+        value: QVariant,
+        role: int = Qt.ItemDataRole.EditRole,
+    ) -> bool:
+        """Set the data for the given index and role."""
+        if not index.isValid() or role != Qt.ItemDataRole.CheckStateRole:
+            return False
+        sample, tomogram_index = self._get_data(index)
+        if sample == "" or tomogram_index == -1:
+            return False
+
+        # Update selection state
+        if value == Qt.CheckState.Checked:
+            self._data[sample].selected[tomogram_index] = True
+        else:
+            self._data[sample].selected[tomogram_index] = False
+
+        self.dataChanged.emit(index, index)
+        return True
 
     def headerData(
         self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole
@@ -236,9 +287,9 @@ class FileModel(QAbstractTableModel):
             return "", -1
         cur_rows = index.row()
         for sample in self._data:
-            if cur_rows < len(self._data[sample]["tomogram_files"]):
+            if cur_rows < len(self._data[sample].tomogram_files):
                 return sample, cur_rows
-            cur_rows -= len(self._data[sample]["tomogram_files"])
+            cur_rows -= len(self._data[sample].tomogram_files)
         logger.warning(f"Index {index} is out of bounds for the current data model.")
         return "", -1
 
@@ -300,7 +351,7 @@ class TomogramModel(QSortFilterProxyModel):
     def __init__(self, source_model: FileModel, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.setSourceModel(source_model)
-        self.sample = ""
+        self.sample = None
 
     def setSample(self, sample: str) -> None:
         """Set the sample for the model."""
@@ -321,6 +372,9 @@ class TomogramModel(QSortFilterProxyModel):
 
     def filterAcceptsRow(self, source_row: int, source_parent: QModelIndex) -> bool:
         """Filter rows based on the sample name."""
+        # Accept nothing if no sample is set
+        if self.sample is None:
+            return False
         # Only accept current sample
         index = self.sourceModel().index(source_row, 0, source_parent)
         sample, _ = self.sourceModel()._get_data(index)

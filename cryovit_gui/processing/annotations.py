@@ -5,7 +5,6 @@ import sys
 from pathlib import Path
 from PIL import Image
 from typing import List
-import logging
 
 from tqdm import tqdm
 import h5py
@@ -14,13 +13,76 @@ import pandas as pd
 from scipy import ndimage
 from sklearn.model_selection import KFold
 
-# Setup logger
-logger = logging.getLogger(__name__)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-formatter = logging.Formatter("%(levelname)s:%(name)s:%(message)s")
-handler.setFormatter(formatter)
-logger.addHandler(handler)
+#### Logging Setup ####
+
+import logging
+
+logger = logging.getLogger("cryovit.processing.annotations")
+debug_logger = logging.getLogger("debug")
+
+
+def generate_slices(
+    src_dir: Path,
+    dst_dir: Path,
+    csv_file: Path,
+):
+    """Extract slices from tomograms using a .csv file with z-limits and slice indices and save them as .png files."""
+    # Clear the destination directory if it exists
+    if dst_dir.exists() and dst_dir.is_dir():
+        try:
+            shutil.rmtree(dst_dir)
+        except OSError as e:
+            logger.error(f"Error clearing destination directory {dst_dir}: {e}")
+            debug_logger.error(
+                f"Error clearing destination directory {dst_dir}: {e}", exc_info=True
+            )
+    os.makedirs(dst_dir, exist_ok=True)
+
+    annotation_df = pd.read_csv(csv_file)
+    for i, row in tqdm(
+        enumerate(annotation_df.itertuples()),
+        desc="Extracting slices",
+        total=len(annotation_df),
+    ):
+        # Get the tomogram name and z-limits from the DataFrame
+        tomo_name = row[1]
+        z_min, z_max = row[2:4]
+        slices = row[4:]
+        src_file = src_dir / tomo_name
+        dst_file = dst_dir / tomo_name
+
+        # Load the tomogram data
+        try:
+            with h5py.File(src_file, "r") as fh:
+                data = fh["data"][()]  # d, w, h
+        except OSError as e:
+            logger.error(
+                f"Error reading file {src_file}: {e}. Trying to load with mrcfile."
+            )
+            debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
+            data = None
+        try:
+            data = data or mrcfile.read(src_file)
+        except OSError as e:
+            logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
+            debug_logger.error(
+                f"Error reading file {src_file} with mrcfile: {e}", exc_info=True
+            )
+            continue
+
+        # Save slices as images
+        for idx in slices:
+            if z_min <= idx < z_max:
+                out_path = dst_file.parent / f"{dst_file.stem}_{idx}.png"
+                img = data[idx]
+                # Normalize and convert to uint8
+                img = ((img + 1) * 0.5 * 255 / np.max(img)).astype("uint8")
+                img = Image.fromarray(img)
+                img.save(out_path)
+            else:
+                logger.warning(
+                    f"Slice index {idx} out of bounds for {tomo_name}. Skipping."
+                )
 
 
 def add_annotations(
@@ -50,11 +112,28 @@ def add_annotations(
         tomo_name = row[1]
         z_min, z_max = row[2:4]
         slices = row[4:]
-        dst_tomo = dst_dir / tomo_name
+        src_file = src_dir / tomo_name
+        dst_file = dst_dir / tomo_name
 
         # Load the tomogram data
-        with h5py.File(src_dir / tomo_name, "r") as fh:
-            data = fh["data"][()]  # d, w, h
+        try:
+            with h5py.File(src_file, "r") as fh:
+                data = fh["data"][()]  # d, w, h
+        except OSError as e:
+            logger.error(
+                f"Error reading file {src_file}: {e}. Trying to load with mrcfile."
+            )
+            debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
+            data = None
+        try:
+            data = data or mrcfile.read(src_file)
+        except OSError as e:
+            logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
+            debug_logger.error(
+                f"Error reading file {src_file} with mrcfile: {e}", exc_info=True
+            )
+            continue
+
         # Load annotations
         feature_labels = {feat: np.zeros_like(data, dtype=np.int8) for feat in features}
         for feat in features:
@@ -62,7 +141,7 @@ def add_annotations(
 
         # Add annotations to labels
         for idx in slices:
-            annot_path = annot_dir / f"{tomo_name[:-4]}_{idx}.png"
+            annot_path = dst_file.parent / f"{dst_file.stem}_{idx}.png"
             if annot_path.exists():
                 annotation = np.asarray(Image.open(annot_path))
                 for i, labels in enumerate(feature_labels.values()):
@@ -74,17 +153,13 @@ def add_annotations(
                 continue
 
         # Save the tomogram with annotations
-        with h5py.File(dst_tomo, "a") as fh:
-            if "data" in fh:
-                del fh["data"]
-            fh.create_dataset("data", data=data, compression="gzip")
+        with h5py.File(dst_file.with_suffix(".hdf"), "w+") as fh:
+            fh.create_dataset("data", data=data)
             for feat in features:
-                if feat in fh:
-                    del fh[feat]
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
 
 
-def add_splits(
+def generate_training_splits(
     splits_file: Path,
     csv_file: Path,
     sample: str = None,
