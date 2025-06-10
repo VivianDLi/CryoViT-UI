@@ -5,7 +5,8 @@ from PyQt6.QtCore import QSettings
 from cryovit_gui.models.config_model import ConfigModel
 from cryovit_gui.config import ConfigGroup
 
-## Setup logging ##
+#### Logging Setup ####
+
 import logging
 
 logger = logging.getLogger("cryovit.models.settings")
@@ -19,8 +20,18 @@ class SettingsModel(ConfigModel):
     It allows for easy retrieval and modification of settings data.
     """
 
-    def __init__(self, config: ConfigGroup):
-        super().__init__(config)
+    def __init__(self, config: ConfigGroup, *args, **kwargs):
+        super().__init__(config, *args, **kwargs)
+
+    def remove_setting(self, name: str) -> None:
+        """Remove a setting from the model and reset it to its default value."""
+        key = self._data.get_field(name)
+        if key is None:
+            logger.error(f"Setting {name} not found in the model.")
+            return
+        self._data.set_field(key, key.default)
+        self.dataChanged.emit(self.index(0, 0), self.index(self.rowCount() - 1, 0))
+        logger.info(f"Setting {name} has been removed and reset to default value.")
 
     def reset_settings(self) -> None:
         """Reset all settings to their default values."""

@@ -10,6 +10,7 @@ csv_data = []
 zlimit_markers = None
 slice_markers = None
 
+
 def open_next_tomogram(session):
     from chimerax.markers import MarkerSet  # type: ignore
     from chimerax.core.colors import Color  # type: ignore
@@ -164,11 +165,14 @@ def next_tomogram(session):
             writer.writerows(csv_data)
         session.logger.info(f"Saved {len(csv_data)} tomograms to {csv_path}.")
 
+
 def register_commands(logger):
     from chimerax.core.commands import (  # type: ignore
         CmdDesc,
         register,
+        ListOf,
         OpenFolderNameArg,
+        OpenFileNameArg,
         SaveFolderNameArg,
         SaveFileNameArg,
         StringArg,
@@ -176,19 +180,19 @@ def register_commands(logger):
     )
 
     slices_desc = CmdDesc(
-        required=[("src_dir", OpenFolderNameArg)],
-        optional=[("sample", StringArg)],
+        required=[("src_dir", OpenFolderNameArg), ("sample", StringArg)],
         keyword=[
+            ("num_slices", IntArg),
+            ("tomograms", ListOf(OpenFileNameArg)),
             ("dst_dir", SaveFolderNameArg),
             ("csv_dir", SaveFileNameArg),
-            ("num_slices", IntArg),
         ],
         synopsis="Start setting the z-limits and slice numbers to label for a tomogram sample.",
     )
     next_desc = CmdDesc(
         required=[],
         keyword=[],
-        synopsis="Finish processing current tomogram, save as an image, and open the next tomogram to label.",
+        synopsis="Finish processing current tomogram, add entry to .csv, and open the next tomogram to label.",
     )
     register("start slice labels", slices_desc, set_tomogram_slices, logger=logger)
     register("next", next_desc, next_tomogram, logger=logger)

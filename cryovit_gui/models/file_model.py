@@ -88,14 +88,7 @@ class FileModel(QAbstractTableModel):
                     not sample_df[sample_df["tomo_name"] == file.name].empty
                     for file in tomogram_files
                 ]
-            if update_selection:
-                selected = annotated.copy()
-            else:
-                selected = (
-                    self._data[sample].selected
-                    if sample in self._data
-                    else annotated.copy()
-                )
+            selected = annotated.copy()
             # Check export state
             export_dir = self._slices_dir / sample
             exported = [
@@ -110,8 +103,10 @@ class FileModel(QAbstractTableModel):
             )
         return data
 
-    def update_data(data: FileData, update_selection: bool = False) -> None:
+    def update_data(self, data: FileData, update_selection: bool = False) -> bool:
         """Update the model data with the given data."""
+        if self._data == data:
+            return False
         for sample in data:
             if update_selection:
                 data[sample].selected = data[sample].annotated.copy()
@@ -125,6 +120,7 @@ class FileModel(QAbstractTableModel):
         self.dataChanged.emit(
             self.index(0, 0), self.index(self.rowCount() - 1, self.columnCount() - 1)
         )
+        return True
 
     def set_root(self, root_dir: Path) -> None:
         """Set the root directory and update the model data."""
@@ -194,6 +190,8 @@ class FileModel(QAbstractTableModel):
                         return QBrush(
                             background_color, style=Qt.BrushStyle.Dense6Pattern
                         )
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant(sample)
                     case _:
                         return QVariant()
             case 1:  # Percentage
@@ -204,6 +202,8 @@ class FileModel(QAbstractTableModel):
                         return QBrush(
                             background_color, style=Qt.BrushStyle.Dense6Pattern
                         )
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant((samples_annotated, total_samples))
                     case _:
                         return QVariant()
             case 2:  # Tomogram File
@@ -223,6 +223,8 @@ class FileModel(QAbstractTableModel):
                             if self._data[sample].selected[tomogram_index]
                             else Qt.CheckState.Unchecked
                         )
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant(self._data[sample].annotated[tomogram_index])
                     case _:
                         return QVariant()
             case 3:  # Exported
@@ -233,6 +235,8 @@ class FileModel(QAbstractTableModel):
                             if self._data[sample].exported[tomogram_index]
                             else QBrush(QColor(*Colors.RED))
                         )
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant(self._data[sample].exported[tomogram_index])
                     case _:
                         return QVariant()
             case _:

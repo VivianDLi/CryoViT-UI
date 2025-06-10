@@ -1,22 +1,76 @@
 """Functions and classes for miscellaneous GUI utilities."""
 
 from typing import List, Union
-import logging
 
 from PyQt6.QtCore import QObject, pyqtSignal
 from PyQt6.QtWidgets import QFileDialog
 
-logger = logging.getLogger(__name__)
+from cryovit_gui.config import Colors
+
+#### Logging Setup ####
+import logging
+
+logger = logging.getLogger("cryovit.utils")
 
 
-class EmittingStream(QObject):
-    """Class to pipe stream output to PyQt widgets."""
+class TextEditLogger(logging.Handler, QObject):
+    """Custom logging handler to emit log messages to a QTextEdit."""
 
-    textWritten = pyqtSignal(str)
+    appendLog = pyqtSignal(str)
 
-    def write(self, text):
-        """Write text to the stream."""
-        self.textWritten.emit(str(text))
+    def __init__(self, console):
+        super().__init__()
+        QObject.__init__(self)
+        self.console = console
+        self.appendLog.connect(self.log_to_console)
+
+    def log_to_console(self, msg: str, level: str):
+        """Append a log message to the QTextEdit console."""
+        # Ignore newlines but print whitespaces (no timestamp)
+        if not msg.strip():
+            self.console.insertPlainText(msg)
+            return
+        # Format text with colors
+        match level:
+            case "error":
+                full_text = '<font color="rgb{}">{}</font>'.format(
+                    Colors.RED.value, full_text
+                )
+            case "warning":
+                full_text = '<font color="rgb{}">{}</font>'.format(
+                    Colors.ORANGE.value, full_text
+                )
+            case "success":
+                full_text = '<font color="rgb{}">{}</font>'.format(
+                    Colors.GREEN.value, full_text
+                )
+            case "debug":
+                full_text = '<font color="rgb{}">{}</font>'.format(
+                    Colors.BLUE.value, full_text
+                )
+            case _:
+                full_text = '<font color="rgb{}">{}</font>'.format(
+                    Colors.WHITE.value, full_text
+                )
+        # Add line breaks in HTML
+        full_text = full_text.replace("\n", "<br>")
+        # Write to console ouptut
+        keep_scrolling = (
+            self.consoleText.verticalScrollBar().value()
+            == self.consoleText.verticalScrollBar().maximum()
+        )
+        self.consoleText.insertHtml(full_text)
+        if keep_scrolling:
+            self.consoleText.verticalScrollBar().setValue(
+                self.consoleText.verticalScrollBar().maximum()
+            )
+
+    def emit(self, record):
+        try:
+            msg = self.format(record)
+            self.appendLog.emit(msg, record.levelname.lower())
+        except Exception:
+            self.handleError(record)
 
 
 def select_file_folder_dialog(

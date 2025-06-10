@@ -1,11 +1,17 @@
 """UI dialog window for managing presets in CryoViT."""
 
-from typing import List
-
 from PyQt6.QtWidgets import QDialog, QMessageBox, QDialogButtonBox
 
 import cryovit_gui.resources
 from cryovit_gui.layouts.presetdialog import Ui_Dialog
+from cryovit_gui.config import ConfigKey
+from cryovit_gui.models import SettingsModel
+
+#### Setup logging ####
+import logging
+
+logger = logging.getLogger("cryovit.gui.preset_dialog")
+debug_logger = logging.getLogger("debug")
 
 
 class PresetDialog(QDialog, Ui_Dialog):
@@ -14,9 +20,8 @@ class PresetDialog(QDialog, Ui_Dialog):
     def __init__(
         self,
         parent,
-        title,
-        *presets,
-        current_preset: str = None,
+        title: str,
+        model: SettingsModel,
         load_preset: bool = False,
     ):
         """Initialize the PresetDialog.
@@ -31,26 +36,39 @@ class PresetDialog(QDialog, Ui_Dialog):
         super().__init__(parent)
         self.setupUi(self)
         self.setWindowTitle(title)
-        self.result = None
+        self.model = model
         # UI setup
-        self.presetSelect.addItems(presets)
+        current_preset = self.model.get_config_by_key(
+            ConfigKey(["preset", "current_preset"])
+        ).get_value()
+        available_presets = self.model.get_config_by_key(
+            ConfigKey(["preset", "available_presets"])
+        ).get_value()
+        self.presetSelect.addItems(available_presets)
         if current_preset:
-            self.result = current_preset
             index = self.presetSelect.findText(current_preset)
             if index != -1:
                 self.presetSelect.setCurrentIndex(index)
             else:
-                parent.log(
-                    "warning",
-                    f"Preset '{current_preset}' not found in the list of presets.",
+                logger.warning(
+                    f"Current preset '{current_preset}' not found in available presets. Adding to available presets."
                 )
+                self.presetSelect.addItem(current_preset)
+                self.presetSelect.setCurrentText(current_preset)
+                self.model.get_config_by_key(
+                    ConfigKey(["preset", "available_presets"])
+                ).set_value(available_presets + [current_preset])
         else:
             self.presetSelect.setCurrentIndex(0)
-            self.result = self.presetSelect.itemText(0)
         self.presetName.returnPressed.connect(self._add_preset)
         self.presetName.returnPressed.disconnect(self._remove_preset)
         self.presetAdd.clicked.connect(self._add_preset)
         self.presetRemove.clicked.connect(self._remove_preset)
+        self.presetSelect.currentTextChanged.connect(
+            lambda text: self.model.get_config_by_key(
+                ConfigKey(["preset", "current_preset"])
+            ).set_value(text)
+        )
         # Remove the ability to add new presents if loading a preset
         if load_preset:
             self.presetName.returnPressed.disconnect(self._add_preset)
@@ -63,19 +81,14 @@ class PresetDialog(QDialog, Ui_Dialog):
         self.buttonBox.button(QDialogButtonBox.StandardButton.Ok).setDefault(False)
         self.buttonBox.button(QDialogButtonBox.StandardButton.Cancel).setDefault(False)
 
-    def get_presets(self) -> List[str]:
-        """Get the list of presets."""
-        return [self.presetSelect.itemText(i) for i in range(self.presetSelect.count())]
-
     def _add_preset(self):
         """Add a new preset to the list. If the preset already exists, a warning is shown."""
         try:
             preset_name = self.presetName.text()
-            if not preset_name:
-                return
-            if preset_name in [
+            available_presets = [
                 self.presetSelect.itemText(i) for i in range(self.presetSelect.count())
-            ]:
+            ]
+            if preset_name in available_presets:
                 QMessageBox.warning(
                     self, "Warning", f"Preset '{preset_name}' already exists."
                 )
@@ -83,18 +96,22 @@ class PresetDialog(QDialog, Ui_Dialog):
                 self.presetName.clear()
                 return
             self.presetSelect.addItem(preset_name)
+            self.model.get_config_by_key(
+                ConfigKey(["preset", "available_presets"])
+            ).set_value(available_presets + [preset_name])
             self.presetSelect.setCurrentText(preset_name)
             self.presetName.clear()
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Error adding preset: {e}")
-            return
+            QMessageBox.critical(self, "Error", f"Error adding preset: {e}.")
+            debug_logger.error(f"Error adding preset: {e}.", exc_info=True)
 
     def _remove_preset(self):
         """Remove the selected preset from the list. If no preset is specified, nothing happens. If the preset isn't found, a warning is shown."""
         try:
             preset_name = self.presetName.text()
-            if not preset_name:
-                return
+            available_presets = [
+                self.presetSelect.itemText(i) for i in range(self.presetSelect.count())
+            ]
             index = self.presetSelect.findText(preset_name)
             if index == -1:
                 QMessageBox.warning(
@@ -102,18 +119,11 @@ class PresetDialog(QDialog, Ui_Dialog):
                 )
                 return
             self.presetSelect.removeItem(index)
+            available_presets.remove(preset_name)
+            self.model.get_config_by_key(
+                ConfigKey(["preset", "available_presets"])
+            ).set_value(available_presets)
             self.presetName.clear()
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Error removing preset: {e}")
-            return
-
-    def accept(self):
-        """Override accept to set the result to the selected preset and close the dialog."""
-        index = self.presetSelect.currentIndex()
-        self.result = self.presetSelect.itemText(index) if index != -1 else None
-        super().accept()
-
-    def reject(self):
-        """Override reject to set the result to None and close the dialog."""
-        self.result = None
-        super().reject()
+            debug_logger.error(f"Error removing preset: {e}", exc_info=True)

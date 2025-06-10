@@ -3,7 +3,7 @@
 from dataclasses import dataclass, fields
 from enum import Enum, Flag, auto
 from pathlib import Path
-from typing import Any, List, Union
+from typing import Any, Dict, List, TypedDict, Union
 
 #### Logging Setup ####
 
@@ -23,6 +23,9 @@ class Colors(Enum):
     ORANGE = (248, 150, 30)
     YELLOW = (249, 199, 79)
     GREEN = (144, 190, 109)
+    WHITE = (220, 220, 220)
+    GRAY = (150, 150, 150)
+    BLUE = (30, 136, 229)
 
 
 class ConfigInputType(Flag):
@@ -38,6 +41,8 @@ class ConfigInputType(Flag):
 
 
 ConfigKey = List[str]
+
+
 class SampleData(TypedDict):
     tomogram_files: List[Path]
     annotated: List[bool]

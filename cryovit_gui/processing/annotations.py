@@ -1,11 +1,12 @@
 """Script for adding annotations to tomograms and setting up splits for training."""
 
 import os
-import sys
+import shutil
 from pathlib import Path
 from PIL import Image
 from typing import List
 
+import mrcfile
 from tqdm import tqdm
 import h5py
 import numpy as np
@@ -39,8 +40,8 @@ def generate_slices(
     os.makedirs(dst_dir, exist_ok=True)
 
     annotation_df = pd.read_csv(csv_file)
-    for i, row in tqdm(
-        enumerate(annotation_df.itertuples()),
+    for row in tqdm(
+        annotation_df.itertuples(),
         desc="Extracting slices",
         total=len(annotation_df),
     ):
@@ -114,6 +115,7 @@ def add_annotations(
         slices = row[4:]
         src_file = src_dir / tomo_name
         dst_file = dst_dir / tomo_name
+        annot_file = annot_dir / tomo_name
 
         # Load the tomogram data
         try:
@@ -141,7 +143,7 @@ def add_annotations(
 
         # Add annotations to labels
         for idx in slices:
-            annot_path = dst_file.parent / f"{dst_file.stem}_{idx}.png"
+            annot_path = annot_file.parent / f"{annot_file.stem}_{idx}.png"
             if annot_path.exists():
                 annotation = np.asarray(Image.open(annot_path))
                 for i, labels in enumerate(feature_labels.values()):

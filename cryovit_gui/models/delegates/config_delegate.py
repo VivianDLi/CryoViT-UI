@@ -17,13 +17,12 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 from cryovit_gui.config import ConfigInputType, ConfigField
 from cryovit_gui.models import ConfigModel
-from cryovit_gui.gui import *
+from cryovit_gui.gui import ClickableLineEdit
+from cryovit_gui.utils import select_file_folder_dialog
 
 #### Logging Setup ####
 
 import logging
-
-from cryovit_gui.utils import select_file_folder_dialog
 
 logger = logging.getLogger("cryovit.delegates.config")
 

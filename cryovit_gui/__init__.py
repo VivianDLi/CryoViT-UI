@@ -1,1 +1,1 @@
-"""CryoVIT package for Efficient Segmentation of Cryo-electron Tomograms."""
+"""CryoVIT GUI package for Efficient Segmentation of Cryo-electron Tomograms."""
