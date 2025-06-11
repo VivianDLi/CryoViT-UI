@@ -12,7 +12,7 @@
     },
     "filters": {
         "warnings_and_below": {
-            "()": "__main__.filter_maker",
+            "()": "cryovit_gui.utils.filter_maker",
             "level": "WARNING"
         }
     },

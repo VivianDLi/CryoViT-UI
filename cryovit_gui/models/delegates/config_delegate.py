@@ -6,18 +6,16 @@ from PyQt6.QtWidgets import (
     QStyledItemDelegate,
     QWidget,
     QStyleOptionViewItem,
-    QModelIndex,
     QLineEdit,
     QSpinBox,
     QCheckBox,
-    Qt,
 )
-from PyQt6.QtCore import QRegularExpression
+from PyQt6.QtCore import QRegularExpression, QModelIndex, Qt
 from PyQt6.QtGui import QRegularExpressionValidator
 
 from cryovit_gui.config import ConfigInputType, ConfigField
 from cryovit_gui.models import ConfigModel
-from cryovit_gui.gui import ClickableLineEdit
+from cryovit_gui.gui.clickable_line import ClickableLineEdit
 from cryovit_gui.utils import select_file_folder_dialog
 
 #### Logging Setup ####
@@ -38,7 +36,7 @@ class ConfigDelegate(QStyledItemDelegate):
         self, parent: QWidget, option: QStyleOptionViewItem, index: QModelIndex
     ):
         """Create and return the appropriate editor widget for the given index."""
-        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value()
+        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value
 
         match config_field.input_type:
             case ConfigInputType.FILE:
@@ -85,7 +83,7 @@ class ConfigDelegate(QStyledItemDelegate):
 
     def setEditorData(self, editor: QWidget, index: QModelIndex):
         """Set the data for the editor widget based on the model index."""
-        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value()
+        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value
 
         if isinstance(editor, ClickableLineEdit) or isinstance(editor, QLineEdit):
             editor.setText(config_field.get_value_as_str())
@@ -101,7 +99,7 @@ class ConfigDelegate(QStyledItemDelegate):
 
     def setModelData(self, editor: QWidget, model: ConfigModel, index: QModelIndex):
         """Update the model with the data from the editor widget."""
-        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value()
+        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole).value
 
         if isinstance(editor, ClickableLineEdit) or isinstance(editor, QLineEdit):
             config_field.set_value(editor.text())

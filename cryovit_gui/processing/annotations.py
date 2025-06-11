@@ -63,7 +63,7 @@ def generate_slices(
             debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
             data = None
         try:
-            data = data or mrcfile.read(src_file)
+            data = data if data is not None else mrcfile.read(src_file)
         except OSError as e:
             logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
             debug_logger.error(
@@ -128,7 +128,7 @@ def add_annotations(
             debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
             data = None
         try:
-            data = data or mrcfile.read(src_file)
+            data = data if data is not None else mrcfile.read(src_file)
         except OSError as e:
             logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
             debug_logger.error(
@@ -155,7 +155,7 @@ def add_annotations(
                 continue
 
         # Save the tomogram with annotations
-        with h5py.File(dst_file.with_suffix(".hdf"), "w+") as fh:
+        with h5py.File(dst_file.with_suffix(".hdf"), "w") as fh:
             fh.create_dataset("data", data=data)
             for feat in features:
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")

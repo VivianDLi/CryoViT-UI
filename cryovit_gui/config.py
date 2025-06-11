@@ -1,6 +1,6 @@
 """Dataclasses for configuring settings and options in the CryoViT GUI for processing steps."""
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, field, fields
 from enum import Enum, Flag, auto
 from pathlib import Path
 from typing import Any, Dict, List, TypedDict, Union
@@ -53,6 +53,7 @@ class SampleData(TypedDict):
 FileData = Dict[str, SampleData]
 
 tomogram_exts = [".rec", ".mrc", ".hdf"]
+required_directories = ["tomograms", "csv", "slices"]
 
 # CryoViT commands
 preprocess_command = "cryovit.preprocess"
@@ -77,6 +78,10 @@ class ConfigKey:
         """Return the string representation of the key."""
         return "/".join(self.key)
 
+    def __iter__(self):
+        """Return an iterator over the key."""
+        return iter(self.key)
+
     def add_parent(self, parent: str) -> None:
         """Add a parent key to the current key."""
         self.key.insert(0, parent)
@@ -92,6 +97,11 @@ class ConfigField:
     default: Any = None
     description: str = ""
     required: bool = False
+    parent = None
+
+    def set_parent(self, parent: "ConfigGroup") -> None:
+        """Set the parent group for this configuration field."""
+        self.parent = parent
 
     def get_type(self) -> type:
         """Get the type of the setting field."""
@@ -120,7 +130,7 @@ class ConfigField:
         if self.value is None:
             if self.required and self.default is None:
                 logger.error(f"Value for {self.name} is required but not set.")
-            elif type(self.default) is not target_type():
+            elif self.required and not isinstance(self.default, target_type):
                 logger.error(
                     f"Default value for {self.name} must be of type {target_type.__name__}."
                 )
@@ -128,6 +138,8 @@ class ConfigField:
                 self.value = self.default
         # Check type
         try:
+            if self.value is None:
+                return None
             self.value = target_type(self.value)
         except ValueError as e:
             logger.error(
@@ -203,12 +215,34 @@ class ConfigField:
 class ConfigGroup:
     """Dataclass to hold a group of configurations."""
 
+    name: str
+    parent = None
+
+    def __post_init__(self):
+        """Post-initialization to set parent for all fields."""
+        for f in fields(self):
+            field = getattr(self, f.name)
+            if isinstance(field, ConfigField) or isinstance(field, ConfigGroup):
+                field.set_parent(self)
+
+    def set_parent(self, parent: "ConfigGroup") -> None:
+        """Set the parent group for this configuration group."""
+        self.parent = parent
+
     def get_fields(self, recursive: bool = True) -> List[ConfigKey]:
         """Get a list of all immediate children of the group. If recursive, get a list of keys for the config, where each key is a list of subkeys forming a path."""
         if not recursive:
-            return sorted([ConfigKey([f.name]) for f in fields(self)])
+            return sorted(
+                [
+                    ConfigKey([f.name])
+                    for f in fields(self)
+                    if f.name not in ["name", "parent"]
+                ]
+            )
         results = []
         for f in fields(self):
+            if f.name in ["name", "parent"]:
+                continue
             field = getattr(self, f.name)
             if isinstance(field, ConfigField):
                 results.append(ConfigKey([f.name]))

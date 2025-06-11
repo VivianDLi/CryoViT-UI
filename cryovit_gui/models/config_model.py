@@ -23,20 +23,10 @@ class ConfigModel(QAbstractItemModel):
         super().__init__(*args, **kwargs)
         self._data = config
 
-    def get_config(self, index: QModelIndex) -> ConfigField | ConfigGroup:
-        """Get the ConfigField or ConfigGroup at the given index."""
-        if not index.isValid():
-            return self._data
-        parent_config = self.get_config(index.parent())
-        target_config_key = parent_config.get_fields(recursive=False)[index.row()]
-        target_config = parent_config.get_field(target_config_key)
-        if target_config is None:
-            logger.warning(f"Config at index {index} not found.")
-            return None
-        return target_config
-
-    def get_config_by_key(self, key: ConfigKey) -> ConfigField | ConfigGroup:
+    def get_config_by_key(self, key: ConfigKey | None) -> ConfigField | ConfigGroup:
         """Get the ConfigField or ConfigGroup by its key."""
+        if key is None:
+            return self._data
         target_config = self._data.get_field(key)
         if target_config is None:
             logger.warning(f"Config with key {key} not found.")
@@ -57,7 +47,7 @@ class ConfigModel(QAbstractItemModel):
         """Return the item flags for the given index."""
         if not index.isValid():
             return Qt.ItemFlag.NoItemFlags
-        target_config = self.get_config(index)
+        target_config = index.internalPointer()
         if isinstance(target_config, ConfigGroup):
             return Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsDragEnabled
         elif isinstance(target_config, ConfigField):
@@ -74,7 +64,10 @@ class ConfigModel(QAbstractItemModel):
 
     def rowCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the number of rows for the given parent index."""
-        target_config = self.get_config(parent)
+        if not parent.isValid():
+            # If no parent, return the number of top-level items
+            return len(self._data.get_fields(recursive=False))
+        target_config = parent.internalPointer()
         return (
             len(target_config.get_fields(recursive=False))
             if isinstance(target_config, ConfigGroup)
@@ -83,19 +76,91 @@ class ConfigModel(QAbstractItemModel):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the number of columns for the given parent index."""
-        target_config = self.get_config(parent)
-        if isinstance(target_config, ConfigGroup):
-            return 1
-        elif isinstance(target_config, ConfigField):
+        if not parent.isValid():
+            parent_config = self._data
+        else:
+            parent_config = parent.internalPointer()
+        fields = parent_config.get_fields(recursive=False)
+        has_field = any(
+            [isinstance(parent_config.get_field(f), ConfigField) for f in fields]
+        )
+        if has_field:
             return 2
         else:
-            return 0
+            return 1
+
+    def index(
+        self, row: int, column: int, parent: QModelIndex = QModelIndex()
+    ) -> QModelIndex:
+        """Return the index for the given row, column, and parent index."""
+        if not parent.isValid():
+            # If no parent, return the index for the root item
+            if (
+                row < 0
+                or column < 0
+                or row >= len(self._data.get_fields(recursive=False))
+            ):
+                logger.warning(f"Invalid row {row} or column {column} for root config.")
+                return QModelIndex()
+            config = self._data.get_fields(recursive=False)[row]
+            return self.createIndex(row, column, self._data.get_field(config))
+        parent_config = parent.internalPointer()
+        if not isinstance(parent_config, ConfigGroup):
+            logger.warning(
+                f"Cannot create index for non-group parent at {parent}: {type(parent_config)}"
+            )
+            return QModelIndex()
+        if (
+            row < 0
+            or column < 0
+            or row >= len(parent_config.get_fields(recursive=False))
+        ):
+            logger.warning(
+                f"Invalid row {row} or column {column} for parent {parent_config.name}."
+            )
+            return QModelIndex()
+        config_key = parent_config.get_fields(recursive=False)[row]
+        if config_key:
+            return self.createIndex(row, column, parent_config.get_field(config_key))
+        else:
+            logger.warning(
+                f"Config at row {row}, column {column} for parent {parent_config.name} not found."
+            )
+            return QModelIndex()
+
+    def parent(self, index: QModelIndex) -> QModelIndex:
+        """Return the parent index for the given index."""
+        if not index.isValid():
+            return QModelIndex()
+        target_config = index.internalPointer()
+        if not isinstance(target_config, (ConfigField, ConfigGroup)):
+            logger.warning(
+                f"Parent requested for non-config item at index {index}: {type(target_config)}"
+            )
+            return QModelIndex()
+        parent_config = target_config.parent
+        if parent_config is None:
+            # If the target config has no parent, it is the root item
+            return QModelIndex()
+        parent_fields = [
+            parent_config.get_field(f)
+            for f in parent_config.get_fields(recursive=False)
+        ]
+        parent_row = (
+            parent_fields.index(target_config) if target_config in parent_fields else -1
+        )
+        if parent_row == -1:
+            logger.warning(
+                f"Parent row for {target_config.name} not found in its parent group."
+            )
+            return QModelIndex()
+        return self.createIndex(parent_row, 0, parent_config)
 
     def data(self, index: QModelIndex, role: int) -> QVariant:
         """Return the data for the given index and role."""
-        target_config = self.get_config(index)
-        if not index.isValid() or target_config is None:
+        if not index.isValid():
             return QVariant()
+        target_config = index.internalPointer()
         if (
             isinstance(target_config, ConfigGroup)
             and role == Qt.ItemDataRole.DisplayRole
@@ -123,9 +188,6 @@ class ConfigModel(QAbstractItemModel):
                 case _:
                     return QVariant()
         else:
-            logger.warning(
-                f"Data requested for unknown config type at index {index}: {type(target_config)}"
-            )
             return QVariant()
 
     def setData(
@@ -134,26 +196,32 @@ class ConfigModel(QAbstractItemModel):
         """Set the data for the given index and role."""
         if not index.isValid() or role != Qt.ItemDataRole.EditRole:
             return False
-        target_config = self.get_config(index)
+        target_config = index.internalPointer()
         # Set data for the index
         if not isinstance(target_config, ConfigField):
             logger.warning(
                 f"Cannot set data for non-field config at index {index}: {type(target_config)}"
             )
             return False
-        target_config.set_value(value.value())
+        target_config.set_value(value)
         self.dataChanged.emit(index, index)  # Notify that data has changed
         return True
 
     def headerData(
-        self, section: int, orientation: Qt.Orientation, role: int = Qt.DisplayRole
+        self,
+        section: int,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.DisplayRole,
     ) -> QVariant:
         """Return the header data for the given section and orientation."""
         # No headers
         return QVariant()
 
     def setHeaderData(
-        self, data: QVariant, orientation: Qt.Orientation, role: int = Qt.DisplayRole
+        self,
+        data: QVariant,
+        orientation: Qt.Orientation,
+        role: int = Qt.ItemDataRole.EditRole,
     ) -> bool:
         """Set the header data for the given section and orientation."""
         return False

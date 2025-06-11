@@ -13,10 +13,19 @@ import logging
 logger = logging.getLogger("cryovit.utils")
 
 
+def filter_maker(level):
+    level = getattr(logging, level)
+
+    def filter(record):
+        return record.levelno <= level
+
+    return filter
+
+
 class TextEditLogger(logging.Handler, QObject):
     """Custom logging handler to emit log messages to a QTextEdit."""
 
-    appendLog = pyqtSignal(str)
+    appendLog = pyqtSignal(str, str)
 
     def __init__(self, console):
         super().__init__()
@@ -24,45 +33,42 @@ class TextEditLogger(logging.Handler, QObject):
         self.console = console
         self.appendLog.connect(self.log_to_console)
 
-    def log_to_console(self, msg: str, level: str):
+    def log_to_console(self, msg: str, level: str, end="\n"):
         """Append a log message to the QTextEdit console."""
-        # Ignore newlines but print whitespaces (no timestamp)
-        if not msg.strip():
-            self.console.insertPlainText(msg)
-            return
+        msg = msg + end
         # Format text with colors
         match level:
             case "error":
-                full_text = '<font color="rgb{}">{}</font>'.format(
-                    Colors.RED.value, full_text
+                msg = '<font style="color:rgb{}">{}</font>'.format(
+                    Colors.DARK_ORANGE.value, msg
                 )
             case "warning":
-                full_text = '<font color="rgb{}">{}</font>'.format(
-                    Colors.ORANGE.value, full_text
+                msg = '<font style="color:rgb{}">{}</font>'.format(
+                    Colors.YELLOW.value, msg
                 )
             case "success":
-                full_text = '<font color="rgb{}">{}</font>'.format(
-                    Colors.GREEN.value, full_text
+                msg = '<font style="color:rgb{}">{}</font>'.format(
+                    Colors.GREEN.value, msg
                 )
             case "debug":
-                full_text = '<font color="rgb{}">{}</font>'.format(
-                    Colors.BLUE.value, full_text
+                msg = '<font style="color:rgb{}">{}</font>'.format(
+                    Colors.BLUE.value, msg
                 )
             case _:
-                full_text = '<font color="rgb{}">{}</font>'.format(
-                    Colors.WHITE.value, full_text
+                msg = '<font style="color:rgb{}">{}</font>'.format(
+                    Colors.WHITE.value, msg
                 )
         # Add line breaks in HTML
-        full_text = full_text.replace("\n", "<br>")
+        msg = msg.replace("\n", "<br>")
         # Write to console ouptut
         keep_scrolling = (
-            self.consoleText.verticalScrollBar().value()
-            == self.consoleText.verticalScrollBar().maximum()
+            self.console.verticalScrollBar().value()
+            == self.console.verticalScrollBar().maximum()
         )
-        self.consoleText.insertHtml(full_text)
+        self.console.insertHtml(msg)
         if keep_scrolling:
-            self.consoleText.verticalScrollBar().setValue(
-                self.consoleText.verticalScrollBar().maximum()
+            self.console.verticalScrollBar().setValue(
+                self.console.verticalScrollBar().maximum()
             )
 
     def emit(self, record):

@@ -4,7 +4,8 @@ import os
 import sys
 import platform
 import traceback
-from typing import Any, List, Tuple
+from copy import copy
+from typing import List, Tuple
 from pathlib import Path
 import shutil
 import psutil
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QInputDialog,
     QMessageBox,
+    QHeaderView,
 )
 from PyQt6.QtCore import (
     Qt,
@@ -71,28 +73,19 @@ from cryovit_gui.processing import (
 #### Logging Setup ####
 
 import logging
+import logging.config
 import json
 
-logging.config.dictConfig(json.load("logging.conf"))
+with open("logging.json", "r") as f:
+    logging.config.dictConfig(json.load(f))
 logger = logging.getLogger("cryovit")
 debug_logger = logging.getLogger("debug")
-
-
-def filter_maker(level):
-    level = getattr(logging, level)
-
-    def filter(record):
-        return record.levelno <= level
-
-    return filter
 
 
 class WorkerSignals(QObject):
     """Signals for background threads to communicate with the GUI."""
 
-    finish = pyqtSignal(
-        Any
-    )  # signals when the thread is finished, containing any return value
+    finish = pyqtSignal()  # signals when the thread is finished
     error = pyqtSignal(tuple)  # signals when the thread errors
 
 
@@ -113,7 +106,7 @@ class Worker(QRunnable):
             exctype, value = sys.exc_info()[:2]
             self.signals.error.emit((exctype, value, traceback.format_exc()))
         finally:
-            self.signals.finish.emit(self.result if hasattr(self, "result") else None)
+            self.signals.finish.emit()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -121,14 +114,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     # Signals for background and external threads and processes
     def _handle_thread_exception(
-        self, info: Tuple[type[BaseException], BaseException, str], *args
+        self,
+        thread_name: str,
+        info: Tuple[type[BaseException], BaseException, str],
+        *args,
     ):
         """Handle exceptions in background threads.
         Args:
             info (Tuple[type[BaseException], BaseException, str]): Tuple containing the exception type, value, and traceback.
         """
         exctype, value, traceback_info = info
-        logger.error(f"Error in thread: {exctype}: {value}.\n{traceback_info}")
+        logger.error(
+            f"Error in thread {thread_name}: {exctype}: {value}.\n{traceback_info}"
+        )
 
     def _handle_process_exception(self, error: QProcess.ProcessError, *args):
         """Handle exceptions in QProcess.
@@ -151,7 +149,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Setup thread pool and processes
         # Limit threads based on memory, assuming 5 GB per thread
         thread_count = max(1, psutil.virtual_memory().available // (5 * 10 ^ 9))
-        self.threadpool: QThreadPool = QThreadPool(thread_count=thread_count)
+        self.threadpool: QThreadPool = QThreadPool()
+        self.threadpool.setMaxThreadCount(thread_count)
         self.progress_dict = {}  # progress bar update dict
         self.chimera_process = None
 
@@ -167,16 +166,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.evaluation_model = ConfigModel(evaluation_config)
         self.inference_model = ConfigModel(inference_config)
         self.settings_model = SettingsModel(settings_config)
+        self.file_model = FileModel()
+        self.sample_model = SampleModel(self.file_model)
+        self.tomogram_model = TomogramModel(self.file_model)
         try:
             self.settings_model.load_settings()
         except ValueError as e:
             logger.warning(f"Error loading settings: {e}\nResetting to defaults.")
             self.settings_model.reset_settings()
-
-        # Setup uninitialized models (wait for user input)
-        self.file_model = None
-        self.sample_model = None
-        self.tomogram_model = None
 
         # Setup UI elements
         try:
@@ -185,7 +182,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.setup_training()
             self.setup_evaluation()
             self.setup_inference()
-            self.setup_settings()
             self.setup_menu()
             self.setup_console()
         except Exception as e:
@@ -235,89 +231,121 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.featuresDisplay.editingFinished.connect(self._update_features)
         self.annotButton.clicked.connect(self.run_add_annotations)
 
+        # Setup views
+        self.sampleView.setModel(self.sample_model)
+        self.sampleView.setSelectionMode(self.sampleView.SelectionMode.SingleSelection)
+        self.sampleView.setSelectionBehavior(
+            self.sampleView.SelectionBehavior.SelectRows
+        )
+        self.sampleView.horizontalHeader().sortIndicatorChanged.connect(
+            self.sampleView.sortByColumn
+        )
+        self.sampleView.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.sampleView.selectionModel().currentChanged.connect(
+            lambda current, _: self.tomogram_model.setSample(
+                self.sample_model.data(current, Qt.ItemDataRole.UserRole)
+            )
+        )
+        self.fileView.setModel(self.tomogram_model)
+        self.fileView.horizontalHeader().sortIndicatorChanged.connect(
+            self.fileView.sortByColumn
+        )
+        self.fileView.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+
         # Setup sync timer
-        self.syncTimer = QTimer(self)
-        self.syncTimer.timeout.connect(self._sync_files)
-        self.syncTimer.start(1000)  # Sync every second
+        # self.syncTimer = QTimer(self)
+        # self.syncTimer.timeout.connect(self._sync_files)
+        # self.syncTimer.start(1000)  # Sync every second
 
         # Setup training split generation
         self.splitsButton.clicked.connect(self.run_training_splits_generation)
 
     def _update_root_directory(self, *args):
         root_dir = Path(self.projectDirectory.text()).resolve()
-        # Check for existing file model
-        if self.file_model is not None:
-            self.file_model.set_root(root_dir)
+        if not FileModel.validate_root(root_dir):
+            self.projectDirectory.setText("")
         else:
-            # First initialization
-            self.file_model = FileModel(root_dir)
-            self.sample_model = SampleModel(self.file_model)
-            self.tomogram_model = TomogramModel(self.file_model)
-
-            self.sampleView.setModel(self.sample_model)
-            self.sampleView.setSelectionMode(Qt.ItemSelectionMode.SingleSelection)
-            self.sampleView.setSelectionBehavior(Qt.SelectionBehavior.SelectRows)
-            self.sampleView.selectionModel().currentChanged.connect(
-                lambda current, _: self.tomogram_model.setSample(
-                    self.sample_model.data(current, Qt.ItemDataRole.UserRole).value()
-                )
+            self.file_model = FileModel(
+                root_dir, self.file_model.file_data, update_selection=True
             )
-            self.fileView.setModel(self.tomogram_model)
+            self.sample_model.setSourceModel(self.file_model)
+            self.tomogram_model.setSourceModel(self.file_model)
+
+    def _sync_files(self, *args):
+        """Update the file model and views based on the current root directory."""
+        self._update_root_directory()
+        # TODO: implement asynchronously
+        # root_dir = Path(self.projectDirectory.text()).resolve()
+        # if FileModel.validate_root(root_dir):
+        #     self.syncIcon = (
+        #         None  # TODO: Implement sync icon timer with self._update_files()
+        #     )
+        #     self.data_worker = Worker(self.file_model.read_data)
+        #     self.data_worker.signals.finish.connect(self._update_files)
+        #     self.data_worker.signals.error.connect(
+        #         partial(self._handle_thread_exception, "Update Files")
+        #     )
+        #     self.threadpool.start(self.data_worker)
+
+    # def _update_files(self, *args):
+    #     pass
 
     def _select_tomograms(self, action: str, *args):
-        if (
-            self.file_model is None
-            or self.tomogram_model is None
-            or self.tomogram_model.sample is None
-        ):
-            logger.warning(
-                "No file model initialized. Please set the project root directory first."
-            )
-            return
         match action:
             case "all":
                 for row in range(self.tomogram_model.rowCount()):
                     index = self.tomogram_model.index(row, 0)
                     if index.isValid():
                         self.tomogram_model.setData(
-                            index, True, Qt.ItemDataRole.EditRole
+                            index, Qt.CheckState.Checked, Qt.ItemDataRole.CheckStateRole
                         )
             case "none":
                 for row in range(self.tomogram_model.rowCount()):
                     index = self.tomogram_model.index(row, 0)
                     if index.isValid():
                         self.tomogram_model.setData(
-                            index, False, Qt.ItemDataRole.EditRole
+                            index,
+                            Qt.CheckState.Unchecked,
+                            Qt.ItemDataRole.CheckStateRole,
                         )
             case _:
-                data = self.file_model.read_data()
-                annotated = data[self.tomogram_model.sample].annotated
+                data = self.file_model.file_data
+                annotated = data[self.tomogram_model.sample]["annotated"]
                 for row in range(self.tomogram_model.rowCount()):
                     index = self.tomogram_model.index(row, 0)
                     if index.isValid():
                         self.tomogram_model.setData(
-                            index, annotated[row], Qt.ItemDataRole.EditRole
+                            index,
+                            (
+                                Qt.CheckState.Unchecked
+                                if annotated[row]
+                                else Qt.CheckState.Checked
+                            ),
+                            Qt.ItemDataRole.CheckStateRole,
                         )
 
     def _import_features(self, *args):
-        feature_file, ok = select_file_folder_dialog(
+        feature_file = select_file_folder_dialog(
             self,
             "Select Features File",
+            False,
+            False,
             "JSON files (*.json)",
-            False,
-            False,
-            start_dir=str(
-                self.settings_model.get_config_by_key(
-                    ConfigKey(["general", "data_directory"])
-                ).get_value()
-            ),
+            start_dir=self.settings_model.get_config_by_key(
+                ConfigKey(["general", "data_directory"])
+            ).get_value_as_str(),
         )
-        if not ok or not feature_file:
+        if not feature_file:
             return
         try:
-            feature_data = json.load(feature_file)
+            with open(feature_file, "r") as fp:
+                feature_data = json.load(fp)
             feature_data = sorted(
-                feature_data, key=lambda x: x["png_index"], order="desc"
+                feature_data, key=lambda x: x["png_index"], reverse=True
             )
             features = [f["name"] for f in feature_data]
             self.featuresDisplay.setText(", ".join(features))
@@ -331,27 +359,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         str_features = self.featuresDisplay.text()
         self.features = [f.strip() for f in str_features.split(",")]
 
-    def _sync_files(self, *args):
-        """Update the file model and views based on the current root directory."""
-        if self.file_model is not None:
-            self.syncIcon = (
-                None  # TODO: Implement sync icon timer with self._update_files()
-            )
-            data_worker = Worker(self.file_model.read_data)
-            data_worker.signals.finish.connect(self._update_files)
-            data_worker.signals.error.connect(
-                partial(self._handle_thread_exception, "Update Files")
-            )
-            self.threadpool.start(data_worker)
-
-    def _update_files(self, data: FileData, *args):
-        if self.file_model.update_data(data, update_selection=False):
-            logger.info("File model updated with new data.")
-
     def run_chimerax(self, *args):
         """Launch ChimeraX externally to select z-limits and tomogram slices to label (and create .csv file)."""
         # Check for settings
-        chimera_path = self.settings_model.get_config(
+        chimera_path = self.settings_model.get_config_by_key(
             ConfigKey(["annotation", "chimera_path"])
         ).get_value()
         if not chimera_path and platform.system().lower() != "linux":
@@ -362,19 +373,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ).get_value()
 
         # Check for directories
-        if self.file_model is None or not self.file_model.validate_root():
-            logger.warning("No root directory specified.")
+        if not self.file_model.file_data:
+            logger.warning("No directory data found.")
             return
-        sample = self.sample_model.sample
+        sample = self.tomogram_model.sample
         if not sample:
             logger.warning("No sample selected.")
             return
         tomogram_dir = self.file_model.get_directory("tomograms")
         csv_dir = self.file_model.get_directory("csv")
-        slices_dir = self.file_model.get_directory("slices")
-        if not all([tomogram_dir, csv_dir, slices_dir]):
+        if not all([tomogram_dir, csv_dir]):
             logger.warning(
-                "One or more required directories (tomograms, csv, slices) are not available."
+                "One or more required directories (tomograms, csv) are not available."
             )
             return
 
@@ -382,7 +392,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         tomograms = [
             self.tomogram_model.data(
                 self.tomogram_model.index(row, 0), Qt.ItemDataRole.DisplayRole
-            ).value()
+            )
             for row in range(self.tomogram_model.rowCount())
             if self.tomogram_model.data(
                 self.tomogram_model.index(row, 0), Qt.ItemDataRole.CheckStateRole
@@ -396,7 +406,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             tomogram_dir,
             sample,
             tomograms=tomograms,
-            dst_dir=slices_dir,
             csv_dir=csv_dir,
             num_slices=num_slices,
         )
@@ -408,8 +417,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             pyperclip.copy(command)
             # Setup QProcess to run ChimeraX
             self.chimera_process = QProcess()
-            self.chimera_process.finished.connect(self._sync_files)
-            self.chimera_process.errorOccured.connect(
+            self.chimera_process.finished.connect(self._handle_chimera_process_finish)
+            self.chimera_process.errorOccurred.connect(
                 partial(self._handle_process_exception, "ChimeraX Process")
             )
             self.chimera_process.start(process)
@@ -420,18 +429,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         tomogram_dir: Path,
         sample: str,
         tomograms: List[str] = None,
-        dst_dir: Path = None,
         csv_dir: Path = None,
         num_slices: int = 5,
     ) -> Tuple[str, str]:
         if self.chimera_process is not None:
+            logger.warning("ChimeraX process already running.")
             return None, None  # ChimeraX process already running
         # Create script args
         commands = [
             "open",
             chimera_script_path,
             ";",
-            "start slice labels",
+            "start selection",
             str(tomogram_dir.resolve()),
             sample,
             "num_slices",
@@ -439,12 +448,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ]
         # Check for optional arguments
         if tomograms:
-            commands.extend(["tomograms", "(" + ",".join(tomograms) + ")"])
-        if dst_dir:
-            commands.extend(["dst_dir", str(dst_dir.resolve())])
+            commands.extend(["tomograms", ",".join(tomograms)])
         if csv_dir:
             commands.extend(["csv_dir", str(csv_dir.resolve())])
         command = " ".join(commands)
+        process = str(chimera_path.resolve())
         # Validate ChimeraX path based on OS
         match platform.system().lower():
             case "windows":  # Needs to be run from a specific path
@@ -470,12 +478,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 process = None
         return process, command
 
+    def _handle_chimera_process_finish(self, *args):
+        self._sync_files()
+        self.chimera_process = None
+        logger.info("ChimeraX closed.")
+
     def run_slice_generation(self, *args):
         # Check for directories
-        if self.file_model is None or not self.file_model.validate_root():
-            logger.warning("No root directory specified.")
+        if not self.file_model.file_data:
+            logger.warning("No directory data found.")
             return
-        sample = self.sample_model.sample
+        sample = self.tomogram_model.sample
         if not sample:
             logger.warning("No sample selected.")
             return
@@ -487,7 +500,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "One or more required directories (tomograms, csv, slices) are not available."
             )
             return
+        src_dir = tomogram_dir / sample
         csv_file = csv_dir / f"{sample}.csv"
+        dst_dir = slices_dir / sample
         if not csv_file.exists():
             logger.warning(
                 f"No CSV file found for sample {sample} in {csv_file}. Please run the ChimeraX annotation first."
@@ -505,15 +520,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "Incomplete Annotations",
                 f"Only {annotated} out of {total} tomograms for sample {sample} have been annotated. Are you sure you want to generate slices for this sample?",
                 buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                defaultbutton=QMessageBox.StandardButton.Yes,
+                defaultButton=QMessageBox.StandardButton.Yes,
             )
             if continue_slices == QMessageBox.StandardButton.No:
                 return
 
         # Setup thread
-        slice_worker = Worker(
-            partial(generate_slices, tomogram_dir, slices_dir, csv_file)
-        )
+        slice_worker = Worker(partial(generate_slices, src_dir, dst_dir, csv_file))
         slice_worker.signals.finish.connect(
             partial(logger.info, "Slice generation complete.")
         )
@@ -531,10 +544,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # Check for directories
-        if self.file_model is None or not self.file_model.validate_root():
-            logger.warning("No root directory specified.")
+        if not self.file_model.file_data:
+            logger.warning("No directory data found.")
             return
-        sample = self.sample_model.sample
+        sample = self.tomogram_model.sample
         if not sample:
             logger.warning("No sample selected.")
             return
@@ -546,7 +559,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 "One or more required directories (tomograms, csv, slices) are not available."
             )
             return
+        src_dir = tomogram_dir / sample
         csv_file = csv_dir / f"{sample}.csv"
+        slices_dir = slices_dir / sample
         if not csv_file.exists():
             logger.warning(
                 f"No CSV file found for sample {sample} in {csv_file}. Please run the ChimeraX annotation first."
@@ -554,22 +569,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # Check completion status
-        annotations_present = [
-            self.sample_model.data(
-                self.sample_model.index(row, 3), Qt.ItemDataRole.UserRole
-            ).value()
-            for row in range(self.sample_model.rowCount())
-            if self.sample_model.data(
-                self.sample_model.index(row, 0), Qt.ItemDataRole.UserRole
-            ).value()
-            == sample
-        ]
-        annotated = sum(annotations_present)
-        if annotated == 0:
+        annotations_present = self.file_model.file_data[sample]["exported"]
+        if not all(annotations_present):
             QMessageBox.warning(
                 self,
                 "Annotations Required",
-                "No annotations found for this sample. Please make sure exported annotations are present in the Annotations folder.",
+                "Annotations missing for this sample. Please make sure exported annotations are present in the Annotations folder.",
                 buttons=QMessageBox.StandardButton.Ok,
             )
             return
@@ -578,8 +583,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         annotations_worker = Worker(
             partial(
                 add_annotations,
-                tomogram_dir,
-                tomogram_dir,
+                src_dir,
+                src_dir,
                 slices_dir,
                 csv_file,
                 self.features,
@@ -609,8 +614,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             return
 
         # Check for directories
-        if self.file_model is None or not self.file_model.validate_root():
-            logger.warning("No root directory specified.")
+        if not self.file_model.file_data:
+            logger.warning("No directory data found.")
             return
         sample = self.sample_model.sample
         if not sample:
@@ -665,7 +670,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_training(self):
         """Setup the training tab in the main window."""
         self.trainView.setModel(self.training_model)
-        self.trainView.setItemDelegate(ConfigDelegate(self.trainView))
+        # self.trainView.setItemDelegate(ConfigDelegate(self.trainView))
         self.trainButton.clicked.connect(self.run_training)
 
     def run_training(self, *args):
@@ -681,7 +686,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_evaluation(self):
         """Setup the evaluation tab in the main window."""
         self.evalView.setModel(self.evaluation_model)
-        self.evalView.setItemDelegate(ConfigDelegate(self.evalView))
+        # self.evalView.setItemDelegate(ConfigDelegate(self.evalView))
         self.evalButton.clicked.connect(self.run_evaluation)
 
     def run_evaluation(self, *args):
@@ -696,15 +701,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def setup_inference(self):
         """Setup the inference tab in the main window."""
-        self.inferenceView.setModel(self.inference_model)
-        self.inferenceView.setItemDelegate(ConfigDelegate(self.inferenceView))
-        self.inferenceButton.clicked.connect(self.run_inference)
+        self.segmentView.setModel(self.inference_model)
+        # self.segmentView.setItemDelegate(ConfigDelegate(self.segmentView))
+        self.segmentButton.clicked.connect(self.run_inference)
 
     def run_inference(self, *args):
         """Generate CLI command to run inference from a terminal."""
         # Get config from view model
         commands = ["-m", inference_command]
-        commands += self.inferenceView.model().generate_commands()
+        commands += self.segmentView.model().generate_commands()
         command = "python " + " ".join(commands)
         # Copy to clipboard
         pyperclip.copy(command)
@@ -720,11 +725,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Select {name} {'directory' if is_folder else 'file'}:",
                 is_folder,
                 is_multiple,
-                start_dir=str(
-                    self.settings_model.get_config_by_key(["general", "data_directory"])
+                start_dir=self.settings_model.get_config_by_key(
+                    ["general", "data_directory"]
                 ).get_value_as_str(),
             )
         )
+        text_field.editingFinished.emit()  # Trigger editing finished to update the model
 
     def setup_menu(self):
         """Setup the menu bar for loading and saving presets."""
@@ -754,7 +760,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         preset_dialog = PresetDialog(
             self,
             "Load preset",
-            self.settings_model.copy(),
+            SettingsModel(copy(self.settigns_model.get_config_by_key(None))),
             load_preset=True,
         )
         result = preset_dialog.exec()
@@ -780,7 +786,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             preset_dialog = PresetDialog(
                 self,
                 "Save preset",
-                self.settings_model.copy(),
+                SettingsModel(copy(self.settings_model.get_config_by_key(None))),
                 load_preset=False,
             )
             result = preset_dialog.exec()
@@ -798,9 +804,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def open_settings(self, *args):
         """Open the settings window."""
-        window = SettingsWindow(self, self.settings_model.copy())
+        window = SettingsWindow(
+            self, SettingsModel(copy(self.settings_model.get_config_by_key(None)))
+        )
         result = window.exec()
-        if result == self.settings.DialogCode.Accepted:
+        if result == window.DialogCode.Accepted:
             self.settings_model = window.settingsView.model()
             self.settings_model.save_settings()
             logger.info("Settings updated successfully.")
@@ -815,7 +823,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select downloaded dataset base directory:",
             True,
             False,
-            start_dir=str(self.settings.get_setting("general/data_directory")),
+            start_dir=self.settings_model.get_config_by_key(
+                ConfigKey(["general", "data_directory"])
+            ).get_value_as_str(),
         )
         if not src_dir or not os.path.isdir(src_dir):
             logger.warning("No valid directory selected.")
@@ -854,7 +864,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select raw tomogram base directory:",
             True,
             False,
-            start_dir=str(self.settings.get_setting("general/data_directory")),
+            start_dir=self.settings_model.get_config_by_key(
+                ConfigKey(["general", "data_directory"])
+            ).get_value_as_str(),
         )
         if not data_dir or not os.path.isdir(data_dir):
             logger.warning("No valid directory selected.")
@@ -891,7 +903,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         """Override close event to save settings."""
-        self.syncTimer.stop()
+        # self.syncTimer.stop()
         self.settings_model.save_settings()
         event.accept()
 

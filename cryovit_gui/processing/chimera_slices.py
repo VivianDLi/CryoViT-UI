@@ -1,25 +1,23 @@
 """Script to select tomogram slices to label and set-up min and max z-values for annotation and export slices as pngs in ChimeraX."""
 
-src_path = None
-dst_path = None
-csv_path = None
-slice_n = 5
-files = None
-file_n = 0
-csv_data = []
-zlimit_markers = None
-slice_markers = None
+from typing import List
+
+state_dict = {}
 
 
 def open_next_tomogram(session):
     from chimerax.markers import MarkerSet  # type: ignore
     from chimerax.core.colors import Color  # type: ignore
+    from chimerax.map import Volume  # type: ignore
 
-    global zlimit_markers, slice_markers
+    global state_dict
 
-    session.logger.info(f"Opening {files[file_n]}")
+    tomo_name = state_dict["tomograms"][state_dict["cur_idx"]]
+    session.logger.info(f"Opening {tomo_name}")
     try:
-        models, _ = session.open_command.open_data(str(files[file_n]))
+        models, _ = session.open_command.open_data(
+            str(state_dict["source"] / tomo_name)
+        )
         # Create marker sets
         zlimit_markers = MarkerSet(session, name="zlimits")
         zlimit_markers.set_color(Color((1, 0, 0)))
@@ -27,88 +25,108 @@ def open_next_tomogram(session):
         slice_markers.set_color(Color((0, 1, 0)))
         session.models.add(models)
         session.models.add([zlimit_markers, slice_markers])
-    except Exception as e:
-        session.logger.error(f"Error opening tomogram {files[file_n]}: {e}")
-        return
-
-
-def save_slices(session, filename, slices):
-    import os
-    from PIL import Image
-    import numpy as np
-    from chimerax.map import Volume  # type: ignore
-
-    global dst_path
-
-    try:
-        # Get tomogram data from Volume model
-        data = None
-        for model in session.models:
+        state_dict["zlim_markers"] = zlimit_markers
+        state_dict["slice_markers"] = slice_markers
+        # Change to plane view
+        for model in models:
             if isinstance(model, Volume):
-                data = model.data.read_matrix(
-                    (0, 0, 0), model.data.size, (1, 1, 1), False
-                )
-        # Check data was found
-        if data is None:
-            session.logger.error(f"No tomogram data found to save.")
-            return
+                pass
+                # x, y, z = model.data.size
+                # model.set_display_style("image")
+                # model.new_region(ijk_min=(0, 0, z // 2), ijk_max=(x - 1, y - 1, z // 2))
 
-        # Save slices as image
-        for idx in slices:
-            out_path = os.path.join(dst_path, f"{filename[:-4]}_{idx}.png")
-            img = data[idx]
-            # Normalize and convert to uint8
-            img = ((img + 1) * 0.5 * 255 / np.max(img)).astype("uint8")
-            img = Image.fromarray(img)
-            img.save(out_path)
     except Exception as e:
-        session.logger.error(f"Error saving slices for {filename}: {e}")
+        session.logger.error(f"Error opening tomogram {tomo_name}: {e}")
+
+
+def save_to_csv(session):
+    import csv
+
+    global state_dict
+
+    csv_df = []
+    try:
+        with open(state_dict["csv"]) as csvfile:
+            reader = csv.DictReader(csvfile)
+            for row in reader:
+                csv_df.append(row)
+    except Exception as e:
+        session.logger.error(
+            f"Couldn't read information from {state_dict['csv']}. {e}."
+        )
         return
+    # Get data from state_dict
+    z_limits = sorted([round(a.coord[2]) for a in state_dict["zlim_markers"].atoms])
+    z_limits[1] += 1  # Adjust for end exclusion
+    slices = sorted([round(a.coord[2]) for a in state_dict["slice_markers"].atoms])
+    csv_data = {
+        "tomo_name": state_dict["tomograms"][state_dict["cur_idx"]],
+        "z_min": z_limits[0],
+        "z_max": z_limits[1],
+    }
+    for i in range(len(slices)):
+        csv_data[f"slice_{i}"] = slices[i]
+    # Add/replace entry in previous .csv
+    tomo_names = [row["tomo_name"] for row in csv_df]
+    if csv_data["tomo_name"] in tomo_names:  # Replace
+        idx = tomo_names.index(csv_data["tomo_name"])
+        csv_df[idx] = csv_data
+    else:  # Add
+        csv_df.append(csv_data)
+
+    # Write new .csv back to disk
+    try:
+        with open(state_dict["csv"], "w+") as csvfile:
+            fieldnames = list(csv_data.keys())
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for item in csv_df:
+                writer.writerow(item)
+        session.logger.info(
+            f"Saved {csv_data['tomo_name']} data to {state_dict['csv']}."
+        )
+    except Exception as e:
+        session.logger.error(f"Couldn't save slices for {csv_data['tomo_name']}. {e}.")
 
 
 def set_tomogram_slices(
     session,
     src_dir: str,
-    sample: str = None,
-    dst_dir: str = None,
-    csv_dir: str = None,
+    sample: str,
     num_slices: int = 5,
+    tomograms: List[str] = None,
+    csv_dir: str = "",
 ):
     import os
     from pathlib import Path
 
-    global src_path, dst_path, csv_path, slice_n, files, file_n, csv_data
+    global state_dict
 
-    # Check for .png dst folder
-    if dst_dir:
-        dst_path = Path(dst_dir).resolve()
-    else:
-        dst_path = Path(src_dir).parent.resolve() / "slices"
-
-    if sample:
-        src_path = Path(src_dir).resolve() / sample
-    else:
-        src_path = Path(src_dir).resolve()
-        sample = src_path.name
-    dst_path = dst_path / sample
-    # Create destination directory if it doesn't exist
-    os.makedirs(dst_path, exist_ok=True)
-    # Check for .csv file
-    if csv_dir:
-        csv_path = Path(csv_dir).resolve() / f"{sample}.csv"
-    else:
-        csv_path = Path(src_dir).parent.resolve() / "csv" / f"{sample}.csv"
-    # Create csv directory if it doesn't exist
+    # Check for directories
+    src_dir = Path(src_dir).resolve()
+    if not src_dir.is_dir() or not (src_dir / sample).is_dir():
+        session.logger.warning(
+            f"Invalid source (tomogram) directory {src_dir} with sample {sample}."
+        )
+    csv_path = Path(csv_dir).resolve() / f"{sample}.csv"
+    src_path = src_dir / sample
     os.makedirs(csv_path.parent, exist_ok=True)
-    slice_n = num_slices
-    files = list(
-        p.resolve() for p in src_path.glob("*") if p.suffix in [".rec", ".mrc", ".hdf"]
-    )
-    file_n = 0
-    csv_data = []
 
+    # Save state
+    state_dict = {
+        "source": src_path,
+        "csv": csv_path,
+        "sample": sample,
+        "num_slices": num_slices,
+        "tomograms": tomograms or src_path.glob("*"),
+        "cur_idx": 0,
+        "z_lims": [],
+        "slices": [],
+    }
     # Preview the number of valid tomogram files
-    session.logger.info(f"Found {len(list(files))} tomogram files for {sample}.")
+    session.logger.info(
+        f"Starting annotations for {len(tomograms)} tomograms in sample {sample}."
+    )
     # Start looping through all tomogram files
     open_next_tomogram(session)
 
@@ -116,54 +134,38 @@ def set_tomogram_slices(
 def next_tomogram(session):
     from chimerax.std_commands.close import close  # type: ignore
 
-    global csv_path, slice_n, files, file_n, csv_data
+    global state_dict
 
     # Check that labelling has started
-    if not src_path:
+    if not state_dict:
         session.logger.error(
             "Please start labelling tomograms first using 'start slice labels'."
         )
         return
 
     # Check if markers are placed
-    if zlimit_markers and len(zlimit_markers.atoms) != 2:
+    if state_dict["zlim_markers"] and len(state_dict["zlim_markers"].atoms) != 2:
         session.logger.error(
-            f"Please place two markers for z-limits. Currently there are {len(zlimit_markers.atoms)} markers."
+            f"Please place two markers for z-limits. Currently there are {len(state_dict['zlim_markers'].atoms)} markers."
         )
         return
-    if slice_markers and len(slice_markers.atoms) != slice_n:
+    if (
+        state_dict["slice_markers"]
+        and len(state_dict["slice_markers"].atoms) != state_dict["num_slices"]
+    ):
         session.logger.error(
-            f"Please place {slice_n} markers for slices. Currently there are {len(slice_markers.atoms)} markers."
+            f"Please place {state_dict['num_slices']} markers for slices. Currently there are {len(state_dict['slice_markers'].atoms)} markers."
         )
         return
-    # Save data to .csv file
-    zlimits = sorted([round(a.coord[2]) for a in zlimit_markers.atoms])
-    # Adjust for end exclusion
-    zlimits[1] += 1
-    slices = sorted([round(a.coord[2]) for a in slice_markers.atoms])
-    csv_data.append([str(files[file_n].name), zlimits[0], zlimits[1]] + slices)
 
-    # Save tomogram slices to .png file
-    save_slices(session, str(files[file_n].name), slices)
-
+    save_to_csv(session)
     # Close tomogram
     close(session)
-    # Open next tomogram if available
-    file_n += 1
-    if file_n < len(files):
-        open_next_tomogram(session)
-    else:
-        import csv
 
-        # Save csv data to file
-        with open(csv_path, "w+", newline="") as f:
-            writer = csv.writer(f)
-            header = ["tomo_name", "z_min", "z_max"] + [
-                f"slice_{i}" for i in range(slice_n)
-            ]
-            writer.writerow(header)
-            writer.writerows(csv_data)
-        session.logger.info(f"Saved {len(csv_data)} tomograms to {csv_path}.")
+    # Open next tomogram if available
+    state_dict["cur_idx"] += 1
+    if state_dict["cur_idx"] < len(state_dict["tomograms"]):
+        open_next_tomogram(session)
 
 
 def register_commands(logger):
@@ -172,9 +174,7 @@ def register_commands(logger):
         register,
         ListOf,
         OpenFolderNameArg,
-        OpenFileNameArg,
         SaveFolderNameArg,
-        SaveFileNameArg,
         StringArg,
         IntArg,
     )
@@ -183,9 +183,8 @@ def register_commands(logger):
         required=[("src_dir", OpenFolderNameArg), ("sample", StringArg)],
         keyword=[
             ("num_slices", IntArg),
-            ("tomograms", ListOf(OpenFileNameArg)),
-            ("dst_dir", SaveFolderNameArg),
-            ("csv_dir", SaveFileNameArg),
+            ("tomograms", ListOf(StringArg)),
+            ("csv_dir", SaveFolderNameArg),
         ],
         synopsis="Start setting the z-limits and slice numbers to label for a tomogram sample.",
     )
@@ -194,20 +193,8 @@ def register_commands(logger):
         keyword=[],
         synopsis="Finish processing current tomogram, add entry to .csv, and open the next tomogram to label.",
     )
-    register("start slice labels", slices_desc, set_tomogram_slices, logger=logger)
+    register("start selection", slices_desc, set_tomogram_slices, logger=logger)
     register("next", next_desc, next_tomogram, logger=logger)
 
 
-session.logger.info(  # type: ignore
-    """
-Start labelling tomograms by running 'start slice labels'.
-    This expects as arguments a tomogram directory and, optionally, a sample name. By default, the slices will be saved in a folder called 'slices/sample' in the parent directory of the tomogram directory, and a .csv file will be saved in a folder called 'csv/sample' in that same parent directory.
-    
-    Optional keyword arguments are: 'dst_dir' for specifying the slice directory, 'csv_dir' for specifying the csv directory, and 'num_slices' for specifying the number of slices to label (default is 5).
-
-    For example: 'start slice labels "./Raw Tomograms" Q66' will label 5 slices of the tomograms in the directory "./Raw Tomograms/Q66" and save them in the directory "./slices/Q66" and the csv file in "./csv/Q66".
-    
-After running 'start slice labels', use plane markers to select slices and z-limits, and run 'next' to save the slices and open the next tomogram.
-"""
-)
 register_commands(session.logger)  # type: ignore

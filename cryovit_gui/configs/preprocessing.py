@@ -9,6 +9,7 @@ from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 class PreprocessingConfig(ConfigGroup):
     """Dataclass to hold preprocessing settings."""
 
+    name: str = "Preprocessing Configuration"
     bin_size: ConfigField = ConfigField(
         "Bin Size",
         input_type=ConfigInputType.NUMBER,

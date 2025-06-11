@@ -9,6 +9,7 @@ from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 class ModelConfig(ConfigGroup):
     """Dataclass to hold model configuration."""
 
+    name: str = "Model Configuration"
     model_directory: ConfigField = ConfigField(
         "Model Directory",
         input_type=ConfigInputType.DIRECTORY,
@@ -22,6 +23,7 @@ class ModelConfig(ConfigGroup):
 class DinoConfig(ConfigGroup):
     """Dataclass to hold DINO settings."""
 
+    name: str = "DINO Configuration"
     feature_directory: ConfigField = ConfigField(
         "DINO Feature Directory",
         input_type=ConfigInputType.DIRECTORY,
@@ -41,6 +43,7 @@ class DinoConfig(ConfigGroup):
 class SegmentationConfig(ConfigGroup):
     """Dataclass to hold segmentation configuration."""
 
+    name: str = "Segmentation Configuration"
     batch_size: ConfigField = ConfigField(
         "Segmentation Batch Size",
         input_type=ConfigInputType.NUMBER,
@@ -53,6 +56,7 @@ class SegmentationConfig(ConfigGroup):
 class InferenceConfig(ConfigGroup):
     """Dataclass to hold inference configuration."""
 
+    name: str = "Inference Configuration"
     model: ModelConfig = field(default_factory=ModelConfig)
     dino: DinoConfig = field(default_factory=DinoConfig)
     segmentation: SegmentationConfig = field(default_factory=SegmentationConfig)

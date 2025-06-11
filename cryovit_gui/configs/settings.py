@@ -1,6 +1,7 @@
 """Dataclasses to hold general settings for the CryoViT GUI application."""
 
 from dataclasses import dataclass, field
+from pathlib import Path
 
 from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 
@@ -9,6 +10,7 @@ from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 class GeneralSettings(ConfigGroup):
     """Dataclass to hold general settings relating to the GUI application."""
 
+    name: str = "General Settings"
     data_directory: ConfigField = ConfigField(
         "Data Directory",
         input_type=ConfigInputType.DIRECTORY,
@@ -20,6 +22,7 @@ class GeneralSettings(ConfigGroup):
 class PresetSettings(ConfigGroup):
     """Dataclass to hold preset settings."""
 
+    name: str = "Preset Settings"
     current_preset: ConfigField = ConfigField(
         "Current Preset",
         input_type=ConfigInputType.TEXT,
@@ -38,10 +41,11 @@ class PresetSettings(ConfigGroup):
 class AnnotationSettings(ConfigGroup):
     """Dataclass to hold annotation settings."""
 
+    name: str = "Annotation Settings"
     chimera_path: ConfigField = ConfigField(
         "Chimera Path",
         input_type=ConfigInputType.DIRECTORY,
-        default="",
+        default=Path("E:/Program Files/ChimeraX/bin/ChimeraX.exe"),
         required=True,
         description="Path to the ChimeraX executable for annotation.",
     )
@@ -57,10 +61,11 @@ class AnnotationSettings(ConfigGroup):
 class DinoSettings(ConfigGroup):
     """Dataclass to hold DINO settings."""
 
+    name: str = "DINO Settings"
     model_directory: ConfigField = ConfigField(
         "DINO Model Directory",
         input_type=ConfigInputType.DIRECTORY,
-        default="./DINOv2",
+        default=Path("./DINOv2"),
         required=True,
         description="Directory where the DINO model weights are stored.",
     )
@@ -70,6 +75,7 @@ class DinoSettings(ConfigGroup):
 class Settings(ConfigGroup):
     """Dataclass to hold general settings relating to the GUI application."""
 
+    name: str = "Settings"
     general: GeneralSettings = field(default_factory=GeneralSettings)
     preset: PresetSettings = field(default_factory=PresetSettings)
     annotation: AnnotationSettings = field(default_factory=AnnotationSettings)

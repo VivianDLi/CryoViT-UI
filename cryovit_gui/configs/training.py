@@ -9,6 +9,7 @@ from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 class DinoConfig(ConfigGroup):
     """Dataclass to hold DINO configuration."""
 
+    name: str = "DINO Configuration"
     feature_directory: ConfigField = ConfigField(
         "DINO Feature Directory",
         input_type=ConfigInputType.DIRECTORY,
@@ -28,6 +29,7 @@ class DinoConfig(ConfigGroup):
 class TrainerConfig(ConfigGroup):
     """Dataclass to hold trainer configuration."""
 
+    name: str = "Trainer Configuration"
     num_splits = ConfigField(
         "Number of Splits",
         input_type=ConfigInputType.NUMBER,
@@ -52,5 +54,6 @@ class TrainerConfig(ConfigGroup):
 class TrainingConfig(ConfigGroup):
     """Dataclass to hold training configuration."""
 
+    name: str = "Training Configuration"
     dino: DinoConfig = field(default_factory=DinoConfig)
     trainer: TrainerConfig = field(default_factory=TrainerConfig)

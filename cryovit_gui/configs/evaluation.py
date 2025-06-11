@@ -9,6 +9,7 @@ from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 class DinoConfig(ConfigGroup):
     """Dataclass to hold DINO configuration."""
 
+    name: str = "DINO Configuration"
     feature_directory: ConfigField = ConfigField(
         "DINO Feature Directory",
         input_type=ConfigInputType.DIRECTORY,
@@ -28,6 +29,7 @@ class DinoConfig(ConfigGroup):
 class MetricsConfig(ConfigGroup):
     """Dataclass to hold evaluation metrics configuration."""
 
+    name: str = "Metrics Configuration"
     num_splits = ConfigField(
         "Number of Splits",
         input_type=ConfigInputType.NUMBER,
@@ -40,5 +42,6 @@ class MetricsConfig(ConfigGroup):
 class EvaluationConfig(ConfigGroup):
     """Dataclass to hold evaluation configuration."""
 
+    name: str = "Evaluation Configuration"
     dino: DinoConfig = field(default_factory=DinoConfig)
     metrics: MetricsConfig = field(default_factory=MetricsConfig)

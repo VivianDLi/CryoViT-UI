@@ -14,4 +14,5 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         super().__init__(parent)
         self.setupUi(self)
         self.setWindowTitle("Settings")
-        self.settingsView.setModel(model)
+        self.model = model
+        self.settingsView.setModel(self.model)
