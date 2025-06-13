@@ -1,10 +1,10 @@
 """UI dialog window for viewing, editing, saving, and loading settings."""
 
-from PyQt6.QtWidgets import QDialog
+from PyQt6.QtWidgets import QDialog, QHeaderView
 
 import cryovit_gui.resources
 from cryovit_gui.layouts.settingswindow import Ui_SettingsWindow
-from cryovit_gui.models import SettingsModel
+from cryovit_gui.models import SettingsModel, ConfigDelegate
 
 
 class SettingsWindow(QDialog, Ui_SettingsWindow):
@@ -16,3 +16,6 @@ class SettingsWindow(QDialog, Ui_SettingsWindow):
         self.setWindowTitle("Settings")
         self.model = model
         self.settingsView.setModel(self.model)
+        self.settingsView.setItemDelegate(ConfigDelegate(self.settingsView))
+        self.settingsView.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        self.defaultButton.clicked.connect(self.model.reset_settings)

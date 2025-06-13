@@ -153,6 +153,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.threadpool.setMaxThreadCount(thread_count)
         self.progress_dict = {}  # progress bar update dict
         self.chimera_process = None
+        self.features = []
 
         # Setup data models
         preprocessing_config = PreprocessingConfig()
@@ -193,6 +194,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         """Setup the preprocessing tab in the main window."""
         self.processView.setModel(self.preprocessing_model)
         self.processView.setItemDelegate(ConfigDelegate(self.processView))
+        self.processView.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.processButton.clicked.connect(self.run_preprocessing)
 
     def run_preprocessing(self, *args):
@@ -335,7 +337,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             False,
             False,
             "JSON files (*.json)",
-            start_dir=self.settings_model.get_config_by_key(
+            start_dir=self.settings_model.get_config(
                 ConfigKey(["general", "data_directory"])
             ).get_value_as_str(),
         )
@@ -362,13 +364,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def run_chimerax(self, *args):
         """Launch ChimeraX externally to select z-limits and tomogram slices to label (and create .csv file)."""
         # Check for settings
-        chimera_path = self.settings_model.get_config_by_key(
+        chimera_path = self.settings_model.get_config(
             ConfigKey(["annotation", "chimera_path"])
         ).get_value()
         if not chimera_path and platform.system().lower() != "linux":
             logger.warning("ChimeraX path not set. Please set it in the settings.")
             return
-        num_slices = self.settings_model.get_config_by_key(
+        num_slices = self.settings_model.get_config(
             ConfigKey(["annotation", "num_slices"])
         ).get_value()
 
@@ -601,11 +603,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def run_training_splits_generation(self, *args):
         """Generate training splits .csv file."""
         # Check for settings
-        num_splits = self.training_model.get_config_by_key(
-            ["trainer", "num_splits"]
+        num_splits = self.training_model.get_config(
+            ConfigKey(["trainer", "num_splits"])
         ).get_value()
-        seed = self.training_model.get_config_by_key(
-            ["trainer", "random_seed"]
+        seed = self.training_model.get_config(
+            ConfigKey(["trainer", "random_seed"])
         ).get_value()
         if not self.features:
             logger.warning(
@@ -617,7 +619,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not self.file_model.file_data:
             logger.warning("No directory data found.")
             return
-        sample = self.sample_model.sample
+        sample = self.tomogram_model.sample
         if not sample:
             logger.warning("No sample selected.")
             return
@@ -670,7 +672,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_training(self):
         """Setup the training tab in the main window."""
         self.trainView.setModel(self.training_model)
-        # self.trainView.setItemDelegate(ConfigDelegate(self.trainView))
+        self.trainView.setItemDelegate(ConfigDelegate(self.trainView))
+        self.trainView.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.trainButton.clicked.connect(self.run_training)
 
     def run_training(self, *args):
@@ -686,7 +689,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_evaluation(self):
         """Setup the evaluation tab in the main window."""
         self.evalView.setModel(self.evaluation_model)
-        # self.evalView.setItemDelegate(ConfigDelegate(self.evalView))
+        self.evalView.setItemDelegate(ConfigDelegate(self.evalView))
+        self.evalView.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.evalButton.clicked.connect(self.run_evaluation)
 
     def run_evaluation(self, *args):
@@ -702,7 +706,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def setup_inference(self):
         """Setup the inference tab in the main window."""
         self.segmentView.setModel(self.inference_model)
-        # self.segmentView.setItemDelegate(ConfigDelegate(self.segmentView))
+        self.segmentView.setItemDelegate(ConfigDelegate(self.segmentView))
+        self.segmentView.header().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.segmentButton.clicked.connect(self.run_inference)
 
     def run_inference(self, *args):
@@ -725,8 +730,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 f"Select {name} {'directory' if is_folder else 'file'}:",
                 is_folder,
                 is_multiple,
-                start_dir=self.settings_model.get_config_by_key(
-                    ["general", "data_directory"]
+                start_dir=self.settings_model.get_config(
+                    ConfigKey(["general", "data_directory"])
                 ).get_value_as_str(),
             )
         )
@@ -749,7 +754,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def load_preset(self, *args):
         """Opens a prompt to optionally load previous settings from a saved name."""
-        available_presets = self.settings_model.get_config_by_key(
+        current_preset = self.settings_model.get_config(
+            ConfigKey(["preset", "current_preset"])
+        ).get_value()
+        available_presets = self.settings_model.get_config(
             ConfigKey(["preset", "available_presets"])
         ).get_value()
         if not available_presets:
@@ -760,21 +768,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         preset_dialog = PresetDialog(
             self,
             "Load preset",
-            SettingsModel(copy(self.settigns_model.get_config_by_key(None))),
+            available_presets,
+            current_preset=current_preset,
             load_preset=True,
         )
         result = preset_dialog.exec()
         if result == preset_dialog.DialogCode.Accepted:
-            self.settings_model = preset_dialog.model
-            logger.info(
-                f"Loaded preset: {self.settings_model.get_config_by_key(ConfigKey(['preset', 'current_preset'])).get_value()}"
+            current_preset, available_presets = preset_dialog.results
+            self.settings_model.load_settings(current_preset)
+            self.settings_model.set_config(
+                ConfigKey(["preset", "current_preset"]), current_preset
+            )
+            self.settings_model.set_config(
+                ConfigKey(["preset", "available_presets"]), available_presets
             )
 
     def save_preset(self, replace: bool, *args):
         """Opens a prompt to save the current settings to a preset name."""
         if replace:
             # Save over the current preset without prompting for a name
-            current_preset = self.settings_model.get_config_by_key(
+            current_preset = self.settings_model.get_config(
                 ConfigKey(["preset", "current_preset"])
             ).get_value()
             if not current_preset:
@@ -782,37 +795,44 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     "No preset name specified. Load an existing preset or create a new one."
                 )
                 return
+            self.settings_model.save_settings(current_preset)
         else:
+            current_preset = self.settings_model.get_config(
+                ConfigKey(["preset", "current_preset"])
+            ).get_value()
+            available_presets = self.settings_model.get_config(
+                ConfigKey(["preset", "available_presets"])
+            ).get_value()
             preset_dialog = PresetDialog(
                 self,
                 "Save preset",
-                SettingsModel(copy(self.settings_model.get_config_by_key(None))),
+                available_presets,
+                current_preset=current_preset,
                 load_preset=False,
             )
             result = preset_dialog.exec()
             if result == preset_dialog.DialogCode.Accepted:
-                self.settings_model = preset_dialog.model
-                current_preset = self.settings_model.get_config_by_key(
-                    ConfigKey(["preset", "current_preset"])
-                ).get_value()
+                current_preset, available_presets = preset_dialog.results
+                self.settings_model.set_config(
+                    ConfigKey(["preset", "current_preset"]), current_preset
+                )
+                self.settings_model.set_config(
+                    ConfigKey(["preset", "available_presets"]), available_presets
+                )
+                self.settings_model.save_settings(current_preset)
             else:
                 return  # User cancelled the dialog
-        self.settings_model.save_settings("CryoViT_" + current_preset)
-        logger.info(
-            f"Saved preset: {self.settings_model.get_config_by_key(ConfigKey(['preset', 'current_preset'])).get_value()}"
-        )
 
     def open_settings(self, *args):
         """Open the settings window."""
-        window = SettingsWindow(
-            self, SettingsModel(copy(self.settings_model.get_config_by_key(None)))
-        )
+        self.settings_model.save_settings(force=True, log=False)
+        window = SettingsWindow(self, self.settings_model)
         result = window.exec()
         if result == window.DialogCode.Accepted:
-            self.settings_model = window.settingsView.model()
-            self.settings_model.save_settings()
+            self.settings_model.save_settings(log=False)
             logger.info("Settings updated successfully.")
         else:
+            self.settings_model.load_settings(log=False)
             logger.info("Settings update cancelled.")
 
     def setup_directory(self, *args):
@@ -823,7 +843,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select downloaded dataset base directory:",
             True,
             False,
-            start_dir=self.settings_model.get_config_by_key(
+            start_dir=self.settings_model.get_config(
                 ConfigKey(["general", "data_directory"])
             ).get_value_as_str(),
         )
@@ -864,7 +884,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             "Select raw tomogram base directory:",
             True,
             False,
-            start_dir=self.settings_model.get_config_by_key(
+            start_dir=self.settings_model.get_config(
                 ConfigKey(["general", "data_directory"])
             ).get_value_as_str(),
         )

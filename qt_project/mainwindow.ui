@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>969</width>
-    <height>973</height>
+    <width>800</width>
+    <height>1200</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -45,6 +45,11 @@ color: rgb(20, 20, 20);</string>
     </property>
     <item>
      <widget class="QTabWidget" name="modeTabs">
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
@@ -73,6 +78,11 @@ color: rgb(20, 20, 20);</string>
             <height>50</height>
            </size>
           </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run pre-processing based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
@@ -91,7 +101,7 @@ color: rgb(20, 20, 20);</string>
         <item>
          <widget class="QFrame" name="directoryFrame">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -105,6 +115,11 @@ color: rgb(20, 20, 20);</string>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
            <item>
             <widget class="QLabel" name="projectDirectoryLabel">
+             <property name="font">
+              <font>
+               <pointsize>10</pointsize>
+              </font>
+             </property>
              <property name="toolTip">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The location of the project root directory. This has the following file structure layout:&lt;/p&gt;&lt;p&gt;&amp;gt; Project Root&lt;/p&gt;&lt;p&gt;	&amp;gt; Tomograms&lt;/p&gt;&lt;p&gt;		&amp;gt; Sample 1&lt;/p&gt;&lt;p&gt;			&amp;gt; *.hdf&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; csvs&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; slices&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; Annotations (optional)&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
@@ -116,10 +131,15 @@ color: rgb(20, 20, 20);</string>
            <item>
             <widget class="QLineEdit" name="projectDirectory">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>10</pointsize>
+              </font>
              </property>
              <property name="placeholderText">
               <string>/path/to/the/project/root/directory</string>
@@ -128,6 +148,12 @@ color: rgb(20, 20, 20);</string>
            </item>
            <item>
             <widget class="QToolButton" name="directoryButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="text">
               <string/>
              </property>
@@ -143,214 +169,30 @@ color: rgb(20, 20, 20);</string>
         <item>
          <widget class="QGroupBox" name="annotGroup">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
           </property>
           <property name="font">
            <font>
-            <pointsize>9</pointsize>
+            <pointsize>12</pointsize>
            </font>
           </property>
           <property name="title">
            <string>Annotations</string>
           </property>
-          <layout class="QGridLayout" name="gridLayout">
-           <item row="2" column="4">
-            <widget class="QPushButton" name="deselectAllButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Deselect All</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0">
-            <widget class="QLabel" name="featuresLabel">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Preferred">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Labeled Features:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="0" colspan="2">
-            <widget class="QPushButton" name="chimeraButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>50</height>
-              </size>
-             </property>
-             <property name="font">
-              <font>
-               <pointsize>13</pointsize>
-              </font>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Launches &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX&lt;/span&gt; to select slices to annotate.&lt;/p&gt;&lt;p&gt;The path to &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX.exe&lt;/span&gt; must be specified in File &amp;gt; Settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Launch ChimeraX</string>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0" colspan="6">
-            <widget class="Line" name="line">
-             <property name="orientation">
-              <enum>Qt::Orientation::Horizontal</enum>
-             </property>
-            </widget>
-           </item>
-           <item row="7" column="0" colspan="6">
-            <widget class="QPushButton" name="annotButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>50</height>
-              </size>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read finished annotations and add them to tomograms in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/Tomograms&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Add Annotations</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="selectLabel">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>File Selection Progress:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="1" colspan="2">
-            <widget class="QLineEdit" name="featuresDisplay">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="placeholderText">
-              <string>list features labeled in order of decreasing annotation value</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0" colspan="6">
-            <widget class="QTableView" name="fileView">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="minimumSize">
-              <size>
-               <width>0</width>
-               <height>0</height>
-              </size>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="3">
-            <widget class="QPushButton" name="selectAllButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Select All</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="3" colspan="3">
-            <widget class="QPushButton" name="slicesButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="maximumSize">
-              <size>
-               <width>16777215</width>
-               <height>50</height>
-              </size>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Extracts previously-marked slices to the slice directory for further segmentation in &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;. These are saved in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/slices&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Extract Slices</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="0" colspan="6">
-            <widget class="QTableView" name="sampleView">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="5">
-            <widget class="QToolButton" name="featuresButton">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="5">
-            <widget class="QPushButton" name="resetDefaultButton">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Reset to Default</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1">
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_9">
+           <property name="topMargin">
+            <number>11</number>
+           </property>
+           <property name="bottomMargin">
+            <number>11</number>
+           </property>
+           <item>
             <widget class="QLabel" name="syncIcon">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
@@ -378,6 +220,309 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
+           <item>
+            <widget class="QLabel" name="selectLabel">
+             <property name="font">
+              <font>
+               <pointsize>10</pointsize>
+              </font>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>File Selection Progress:</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableView" name="sampleView">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QFrame" name="frame">
+             <property name="layoutDirection">
+              <enum>Qt::LayoutDirection::LeftToRight</enum>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_3">
+              <item>
+               <spacer name="horizontalSpacer">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="selectAllButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Select All</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="deselectAllButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Deselect All</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="resetDefaultButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="layoutDirection">
+                 <enum>Qt::LayoutDirection::LeftToRight</enum>
+                </property>
+                <property name="text">
+                 <string>Reset to Default</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableView" name="fileView">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QFrame" name="frame_2">
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout">
+              <item>
+               <widget class="QPushButton" name="chimeraButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>12</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Launches &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX&lt;/span&gt; to select slices to annotate.&lt;/p&gt;&lt;p&gt;The path to &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX.exe&lt;/span&gt; must be specified in File &amp;gt; Settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Launch ChimeraX</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="slicesButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>12</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Extracts previously-marked slices to the slice directory for further segmentation in &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;. These are saved in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/slices&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Extract Slices</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QFrame" name="frame_3">
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLabel" name="featuresLabel">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>10</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Labeled Features:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="featuresDisplay">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>10</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="placeholderText">
+                 <string>list features labeled in order of decreasing annotation value</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="featuresButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="resources.qrc">
+                  <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QPushButton" name="annotButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>50</height>
+              </size>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>12</pointsize>
+              </font>
+             </property>
+             <property name="toolTip">
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read finished annotations and add them to tomograms in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/Tomograms&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="text">
+              <string>Add Annotations</string>
+             </property>
+            </widget>
+           </item>
           </layout>
          </widget>
         </item>
@@ -388,6 +533,11 @@ color: rgb(20, 20, 20);</string>
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
           </property>
           <property name="title">
            <string>Training Splits</string>
@@ -409,7 +559,7 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
-               <pointsize>13</pointsize>
+               <pointsize>12</pointsize>
               </font>
              </property>
              <property name="toolTip">
@@ -447,6 +597,11 @@ color: rgb(20, 20, 20);</string>
             <height>50</height>
            </size>
           </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run training based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
@@ -478,6 +633,11 @@ color: rgb(20, 20, 20);</string>
             <width>16777215</width>
             <height>50</height>
            </size>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
           </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run evaluation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
@@ -511,6 +671,11 @@ color: rgb(20, 20, 20);</string>
             <height>50</height>
            </size>
           </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run segmentation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
@@ -541,6 +706,12 @@ color: rgb(20, 20, 20);</string>
     </item>
     <item>
      <widget class="QGroupBox" name="consoleBox">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
       <property name="maximumSize">
        <size>
         <width>16777215</width>
@@ -549,8 +720,11 @@ color: rgb(20, 20, 20);</string>
       </property>
       <property name="font">
        <font>
-        <pointsize>9</pointsize>
+        <pointsize>12</pointsize>
        </font>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::FocusPolicy::ClickFocus</enum>
       </property>
       <property name="title">
        <string>Console</string>
@@ -579,10 +753,22 @@ color: rgb(20, 20, 20);</string>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="font">
+          <font>
+           <family>Segoe UI</family>
+           <pointsize>10</pointsize>
+           <italic>false</italic>
+           <bold>false</bold>
+          </font>
+         </property>
+         <property name="acceptDrops">
+          <bool>false</bool>
+         </property>
          <property name="styleSheet">
           <string notr="true">background-color: rgb(90, 90, 90);
 color: rgb(255, 255, 255);
-border-color: rgb(90, 90, 90);</string>
+border-color: rgb(90, 90, 90);
+font: 10pt &quot;Segoe UI&quot;;</string>
          </property>
          <property name="frameShape">
           <enum>QFrame::Shape::WinPanel</enum>
@@ -615,8 +801,8 @@ border-color: rgb(90, 90, 90);</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>969</width>
-     <height>37</height>
+     <width>800</width>
+     <height>25</height>
     </rect>
    </property>
    <property name="autoFillBackground">

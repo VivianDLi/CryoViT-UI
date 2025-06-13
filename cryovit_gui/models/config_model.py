@@ -2,7 +2,7 @@
 
 from PyQt6.QtCore import QAbstractItemModel, QModelIndex, QVariant, Qt
 
-from cryovit_gui.config import *
+from cryovit_gui.config import ConfigGroup, ConfigField, ConfigKey
 
 #### Logging Setup ####
 
@@ -21,27 +21,7 @@ class ConfigModel(QAbstractItemModel):
 
     def __init__(self, config: ConfigGroup, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self._data = config
-
-    def get_config_by_key(self, key: ConfigKey | None) -> ConfigField | ConfigGroup:
-        """Get the ConfigField or ConfigGroup by its key."""
-        if key is None:
-            return self._data
-        target_config = self._data.get_field(key)
-        if target_config is None:
-            logger.warning(f"Config with key {key} not found.")
-            return None
-        return target_config
-
-    def generate_commands(self) -> List[str]:
-        """Generate a list of commands based on the current configuration."""
-        commands = []
-        for key in self._data.get_fields(recursive=True):
-            field = self._data.get_field(key)
-            command_name = ".".join(key)
-            command_value = field.get_value_as_str()
-            commands.append(f"{command_name}={command_value}")
-        return commands
+        self._config = config
 
     def flags(self, index: QModelIndex) -> Qt.ItemFlag:
         """Return the item flags for the given index."""
@@ -66,28 +46,27 @@ class ConfigModel(QAbstractItemModel):
         """Return the number of rows for the given parent index."""
         if not parent.isValid():
             # If no parent, return the number of top-level items
-            return len(self._data.get_fields(recursive=False))
-        target_config = parent.internalPointer()
+            return len(self._config.get_fields(recursive=False))
+        parent_config = parent.internalPointer()
         return (
-            len(target_config.get_fields(recursive=False))
-            if isinstance(target_config, ConfigGroup)
+            len(parent_config.get_fields(recursive=False))
+            if isinstance(parent_config, ConfigGroup)
             else 0
         )
 
+    def hasChildren(self, parent: QModelIndex = QModelIndex()) -> bool:
+        """Return whether the given parent index has children."""
+        if not parent.isValid():
+            # If no parent, _check if the root config has fields
+            return len(self._config.get_fields(recursive=False)) > 0
+        parent_config = parent.internalPointer()
+        if isinstance(parent_config, ConfigGroup):
+            return len(parent_config.get_fields(recursive=False)) > 0
+        return False
+
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the number of columns for the given parent index."""
-        if not parent.isValid():
-            parent_config = self._data
-        else:
-            parent_config = parent.internalPointer()
-        fields = parent_config.get_fields(recursive=False)
-        has_field = any(
-            [isinstance(parent_config.get_field(f), ConfigField) for f in fields]
-        )
-        if has_field:
-            return 2
-        else:
-            return 1
+        return 2
 
     def index(
         self, row: int, column: int, parent: QModelIndex = QModelIndex()
@@ -95,15 +74,9 @@ class ConfigModel(QAbstractItemModel):
         """Return the index for the given row, column, and parent index."""
         if not parent.isValid():
             # If no parent, return the index for the root item
-            if (
-                row < 0
-                or column < 0
-                or row >= len(self._data.get_fields(recursive=False))
-            ):
-                logger.warning(f"Invalid row {row} or column {column} for root config.")
-                return QModelIndex()
-            config = self._data.get_fields(recursive=False)[row]
-            return self.createIndex(row, column, self._data.get_field(config))
+            config_key = self._config.get_fields(recursive=False)[row]
+            config = self._config.get_field(config_key)
+            return self.createIndex(row, column, config)
         parent_config = parent.internalPointer()
         if not isinstance(parent_config, ConfigGroup):
             logger.warning(
@@ -113,15 +86,17 @@ class ConfigModel(QAbstractItemModel):
         if (
             row < 0
             or column < 0
-            or row >= len(parent_config.get_fields(recursive=False))
+            or row >= self.rowCount(parent)
+            or column >= self.columnCount(parent)
         ):
             logger.warning(
                 f"Invalid row {row} or column {column} for parent {parent_config.name}."
             )
             return QModelIndex()
         config_key = parent_config.get_fields(recursive=False)[row]
-        if config_key:
-            return self.createIndex(row, column, parent_config.get_field(config_key))
+        config = parent_config.get_field(config_key)
+        if config is not None:
+            return self.createIndex(row, column, config)
         else:
             logger.warning(
                 f"Config at row {row}, column {column} for parent {parent_config.name} not found."
@@ -138,23 +113,19 @@ class ConfigModel(QAbstractItemModel):
                 f"Parent requested for non-config item at index {index}: {type(target_config)}"
             )
             return QModelIndex()
-        parent_config = target_config.parent
+        parent_config = target_config.get_parent()
         if parent_config is None:
             # If the target config has no parent, it is the root item
             return QModelIndex()
-        parent_fields = [
-            parent_config.get_field(f)
-            for f in parent_config.get_fields(recursive=False)
-        ]
-        parent_row = (
-            parent_fields.index(target_config) if target_config in parent_fields else -1
-        )
-        if parent_row == -1:
+        parent_keys = parent_config.get_fields(recursive=False)
+        parent_fields = [parent_config.get_field(key) for key in parent_keys]
+        if target_config not in parent_fields:
             logger.warning(
-                f"Parent row for {target_config.name} not found in its parent group."
+                f"Target config {target_config.name} not found in parent group {parent_config.name}."
             )
             return QModelIndex()
-        return self.createIndex(parent_row, 0, parent_config)
+        row = parent_fields.index(target_config)
+        return self.createIndex(row, 0, parent_config)
 
     def data(self, index: QModelIndex, role: int) -> QVariant:
         """Return the data for the given index and role."""
@@ -164,6 +135,7 @@ class ConfigModel(QAbstractItemModel):
         if (
             isinstance(target_config, ConfigGroup)
             and role == Qt.ItemDataRole.DisplayRole
+            and index.column() == 0
         ):
             # Return the name of the configuration group
             return QVariant(target_config.name)
@@ -225,3 +197,53 @@ class ConfigModel(QAbstractItemModel):
     ) -> bool:
         """Set the header data for the given section and orientation."""
         return False
+
+    def get_config(self, key: ConfigKey) -> ConfigField:
+        """
+        Retrieve a specific setting by its key.
+
+        Args:
+            key (ConfigKey): The key of the setting to retrieve.
+
+        Returns:
+            ConfigField: The configuration field associated with the key.
+        """
+        return self._config.get_field(key)
+
+    def _set_config(
+        self, key: ConfigKey, value: str, parent: QModelIndex = None
+    ) -> None:
+        if parent is None or not parent.isValid():
+            parent_config = self._config
+            parent = QModelIndex()
+        else:
+            parent_config = parent.internalPointer()
+        cur_key = key.pop_first()
+        fields = parent_config.get_fields(recursive=False)
+        if (not cur_key) or (not cur_key in fields):
+            logger.warning(
+                f"Setting {cur_key} not found in parent {parent_config.name}."
+            )
+            return
+        config_field = parent_config.get_field(cur_key)
+        if isinstance(config_field, ConfigField):
+            config_field.set_value(value)
+            index = self.index(fields.index(cur_key), 1, parent)
+            self.dataChanged.emit(index, index)
+        elif isinstance(config_field, ConfigGroup):
+            # If the config field is a group, recursively set the setting
+            self._set_config(key, value, self.index(fields.index(cur_key), 0, parent))
+        else:
+            logger.warning(
+                f"Setting {key} is not a ConfigField or ConfigGroup in parent {parent_config.name}."
+            )
+
+    def set_config(self, key: ConfigKey, value: str) -> None:
+        """
+        Set a specific setting by its key.
+
+        Args:
+            key (ConfigKey): The key of the setting to set.
+            value (str): The value to set for the configuration field.
+        """
+        self._set_config(key, value)

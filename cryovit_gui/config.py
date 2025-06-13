@@ -1,6 +1,6 @@
 """Dataclasses for configuring settings and options in the CryoViT GUI for processing steps."""
 
-from dataclasses import dataclass, field, fields
+from dataclasses import dataclass, fields
 from enum import Enum, Flag, auto
 from pathlib import Path
 from typing import Any, Dict, List, TypedDict, Union
@@ -86,6 +86,14 @@ class ConfigKey:
         """Add a parent key to the current key."""
         self.key.insert(0, parent)
 
+    def pop_first(self) -> str:
+        """Pop the first key from the current key."""
+        if self.key:
+            return ConfigKey([self.key.pop(0)])
+        else:
+            logger.error("Cannot pop from an empty ConfigKey.")
+            return ""
+
 
 @dataclass
 class ConfigField:
@@ -97,11 +105,15 @@ class ConfigField:
     default: Any = None
     description: str = ""
     required: bool = False
-    parent = None
+    _parent = None
+
+    def get_parent(self) -> Union["ConfigGroup", None]:
+        """Get the parent group for this configuration field."""
+        return self._parent
 
     def set_parent(self, parent: "ConfigGroup") -> None:
         """Set the parent group for this configuration field."""
-        self.parent = parent
+        self._parent = parent
 
     def get_type(self) -> type:
         """Get the type of the setting field."""
@@ -164,13 +176,16 @@ class ConfigField:
             return ", ".join(map(str, value))
         return str(value)
 
-    def set_value(self, value: Any, from_str: bool) -> None:
+    def set_value(self, value: Any, from_str: bool = False) -> None:
         """Set the value of the setting field."""
         # Parse value from string if needed (i.e., cannot be converted with base types)
         if (
             from_str
-            and self.input_type == ConfigInputType.STR_LIST | ConfigInputType.INT_LIST
+            and self.input_type in ConfigInputType.STR_LIST | ConfigInputType.INT_LIST
         ):
+            if not value:  # empty string
+                self.value = None
+                return
             if self.input_type == ConfigInputType.INT_LIST:
                 map_type = int
             else:
@@ -216,7 +231,7 @@ class ConfigGroup:
     """Dataclass to hold a group of configurations."""
 
     name: str
-    parent = None
+    _parent = None
 
     def __post_init__(self):
         """Post-initialization to set parent for all fields."""
@@ -225,9 +240,13 @@ class ConfigGroup:
             if isinstance(field, ConfigField) or isinstance(field, ConfigGroup):
                 field.set_parent(self)
 
+    def get_parent(self) -> Union["ConfigGroup", None]:
+        """Get the parent group for this configuration group."""
+        return self._parent
+
     def set_parent(self, parent: "ConfigGroup") -> None:
         """Set the parent group for this configuration group."""
-        self.parent = parent
+        self._parent = parent
 
     def get_fields(self, recursive: bool = True) -> List[ConfigKey]:
         """Get a list of all immediate children of the group. If recursive, get a list of keys for the config, where each key is a list of subkeys forming a path."""
@@ -241,7 +260,7 @@ class ConfigGroup:
             )
         results = []
         for f in fields(self):
-            if f.name in ["name", "parent"]:
+            if f.name.startswith("_"):
                 continue
             field = getattr(self, f.name)
             if isinstance(field, ConfigField):
@@ -300,3 +319,13 @@ class ConfigGroup:
         except Exception as e:
             logger.error(f"Failed to save config to {path}: {e}")
             debug_logger.error(f"Failed to save config to {path}: {e}", exc_info=True)
+
+    def generate_commands(self) -> List[str]:
+        """Generate a list of commands based on the current configuration."""
+        commands = []
+        for key in self.get_fields(recursive=True):
+            field = self.get_field(key)
+            command_name = ".".join(key)
+            command_value = field.get_value_as_str()
+            commands.append(f"{command_name}={command_value}")
+        return commands

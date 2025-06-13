@@ -1,4 +1,4 @@
-# Form implementation generated from reading ui file 'preset_dialog.ui'
+# Form implementation generated from reading ui file 'qt_project/presetdialog.ui'
 #
 # Created by: PyQt6 UI code generator 6.9.0
 #
@@ -12,7 +12,7 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(350, 150)
+        Dialog.resize(600, 200)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Minimum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
@@ -32,15 +32,27 @@ class Ui_Dialog(object):
         self.gridLayout = QtWidgets.QGridLayout(self.presetFrame)
         self.gridLayout.setObjectName("gridLayout")
         self.presetName = QtWidgets.QLineEdit(parent=self.presetFrame)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.presetName.setFont(font)
         self.presetName.setObjectName("presetName")
         self.gridLayout.addWidget(self.presetName, 1, 0, 1, 2)
         self.presetLabel = QtWidgets.QLabel(parent=self.presetFrame)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.presetLabel.setFont(font)
         self.presetLabel.setObjectName("presetLabel")
         self.gridLayout.addWidget(self.presetLabel, 0, 0, 1, 1)
         self.presetAdd = QtWidgets.QPushButton(parent=self.presetFrame)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.presetAdd.setFont(font)
         self.presetAdd.setObjectName("presetAdd")
         self.gridLayout.addWidget(self.presetAdd, 1, 2, 1, 1)
         self.presetRemove = QtWidgets.QPushButton(parent=self.presetFrame)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.presetRemove.setFont(font)
         self.presetRemove.setObjectName("presetRemove")
         self.gridLayout.addWidget(self.presetRemove, 1, 3, 1, 1)
         self.presetSelect = QtWidgets.QComboBox(parent=self.presetFrame)
@@ -49,12 +61,18 @@ class Ui_Dialog(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.presetSelect.sizePolicy().hasHeightForWidth())
         self.presetSelect.setSizePolicy(sizePolicy)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.presetSelect.setFont(font)
         self.presetSelect.setCurrentText("")
         self.presetSelect.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.InsertAlphabetically)
         self.presetSelect.setObjectName("presetSelect")
         self.gridLayout.addWidget(self.presetSelect, 0, 1, 1, 3)
         self.verticalLayout.addWidget(self.presetFrame)
         self.buttonBox = QtWidgets.QDialogButtonBox(parent=Dialog)
+        font = QtGui.QFont()
+        font.setPointSize(10)
+        self.buttonBox.setFont(font)
         self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")
@@ -68,7 +86,7 @@ class Ui_Dialog(object):
     def retranslateUi(self, Dialog):
         _translate = QtCore.QCoreApplication.translate
         Dialog.setWindowTitle(_translate("Dialog", "Select an existing preset or create a new one to save:"))
-        self.presetLabel.setText(_translate("Dialog", "Available Preset:"))
+        self.presetLabel.setText(_translate("Dialog", "Available Presets:"))
         self.presetAdd.setText(_translate("Dialog", "Add"))
         self.presetRemove.setText(_translate("Dialog", "Remove"))
         self.presetSelect.setPlaceholderText(_translate("Dialog", "No preset selected"))

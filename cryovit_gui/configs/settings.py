@@ -45,7 +45,7 @@ class AnnotationSettings(ConfigGroup):
     chimera_path: ConfigField = ConfigField(
         "Chimera Path",
         input_type=ConfigInputType.DIRECTORY,
-        default=Path("E:/Program Files/ChimeraX/bin/ChimeraX.exe"),
+        default=Path("C:/Program Files/ChimeraX 1.9/bin/ChimeraX.exe"),
         required=True,
         description="Path to the ChimeraX executable for annotation.",
     )

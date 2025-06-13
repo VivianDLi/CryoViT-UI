@@ -9,6 +9,7 @@ def open_next_tomogram(session):
     from chimerax.markers import MarkerSet  # type: ignore
     from chimerax.core.colors import Color  # type: ignore
     from chimerax.map import Volume  # type: ignore
+    from chimerax.core.commands import run  # type: ignore
 
     global state_dict
 
@@ -30,13 +31,15 @@ def open_next_tomogram(session):
         # Change to plane view
         for model in models:
             if isinstance(model, Volume):
-                pass
-                # x, y, z = model.data.size
-                # model.set_display_style("image")
-                # model.new_region(ijk_min=(0, 0, z // 2), ijk_max=(x - 1, y - 1, z // 2))
+                x, y, z = model.data.size
+                run(
+                    session,
+                    f"volume {model.atomspec} style image region {','.join(list(map(str, [0, 0, z // 2, x - 1, y - 1, z // 2])))} step 1 showOutlineBox true",
+                )
 
     except Exception as e:
         session.logger.error(f"Error opening tomogram {tomo_name}: {e}")
+        return
 
 
 def save_to_csv(session):
@@ -51,10 +54,9 @@ def save_to_csv(session):
             for row in reader:
                 csv_df.append(row)
     except Exception as e:
-        session.logger.error(
-            f"Couldn't read information from {state_dict['csv']}. {e}."
+        session.logger.info(
+            f"Couldn't read information from {state_dict['csv']}. Creating new file."
         )
-        return
     # Get data from state_dict
     z_limits = sorted([round(a.coord[2]) for a in state_dict["zlim_markers"].atoms])
     z_limits[1] += 1  # Adjust for end exclusion
