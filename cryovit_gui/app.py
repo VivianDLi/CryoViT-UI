@@ -235,66 +235,60 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Setup views
         self.sampleView.setModel(self.sample_model)
-        self.sampleView.setSelectionMode(self.sampleView.SelectionMode.SingleSelection)
-        self.sampleView.setSelectionBehavior(
-            self.sampleView.SelectionBehavior.SelectRows
-        )
-        self.sampleView.horizontalHeader().sortIndicatorChanged.connect(
-            self.sampleView.sortByColumn
-        )
-        self.sampleView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
         self.sampleView.selectionModel().currentChanged.connect(
             lambda current, _: self.tomogram_model.setSample(
                 self.sample_model.data(current, Qt.ItemDataRole.UserRole)
             )
         )
+        self.sampleView.setSelectionMode(self.sampleView.SelectionMode.SingleSelection)
+        # Set header size
+        self.sampleView.horizontalHeader().setFixedHeight(50)
+        self.sampleView.setColumnWidth(1, 100)
+        self.sampleView.setColumnWidth(2, 100)
+        self.sampleView.horizontalHeader().setSectionResizeMode(
+            0, self.sampleView.horizontalHeader().ResizeMode.Stretch
+        )
+        self.sampleView.horizontalHeader().sortIndicatorChanged.connect(
+            self.sampleView.sortByColumn
+        )
+        self.sampleView.horizontalHeader().setHighlightSections(False)
+
         self.fileView.setModel(self.tomogram_model)
+        # Set header size
+        self.fileView.horizontalHeader().setFixedHeight(50)
+        self.fileView.setColumnWidth(1, 100)
+        self.fileView.setColumnWidth(2, 100)
+        self.fileView.horizontalHeader().setSectionResizeMode(
+            0, self.fileView.horizontalHeader().ResizeMode.Stretch
+        )
         self.fileView.horizontalHeader().sortIndicatorChanged.connect(
             self.fileView.sortByColumn
         )
-        self.fileView.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
 
         # Setup sync timer
-        # self.syncTimer = QTimer(self)
-        # self.syncTimer.timeout.connect(self._sync_files)
-        # self.syncTimer.start(1000)  # Sync every second
+        self.syncTimer = QTimer(self)
+        self.syncTimer.timeout.connect(partial(self._sync_files, False))
+        self.syncTimer.start(1000)  # Sync every second
 
         # Setup training split generation
         self.splitsButton.clicked.connect(self.run_training_splits_generation)
 
-    def _update_root_directory(self, *args):
+    def _update_root_directory(self, update_selection: bool = True, *args):
         root_dir = Path(self.projectDirectory.text()).resolve()
+        if not self.projectDirectory.text():
+            return
         if not FileModel.validate_root(root_dir):
             self.projectDirectory.setText("")
         else:
             self.file_model = FileModel(
-                root_dir, self.file_model.file_data, update_selection=True
+                root_dir, self.file_model.file_data, update_selection=update_selection
             )
             self.sample_model.setSourceModel(self.file_model)
             self.tomogram_model.setSourceModel(self.file_model)
 
     def _sync_files(self, *args):
         """Update the file model and views based on the current root directory."""
-        self._update_root_directory()
-        # TODO: implement asynchronously
-        # root_dir = Path(self.projectDirectory.text()).resolve()
-        # if FileModel.validate_root(root_dir):
-        #     self.syncIcon = (
-        #         None  # TODO: Implement sync icon timer with self._update_files()
-        #     )
-        #     self.data_worker = Worker(self.file_model.read_data)
-        #     self.data_worker.signals.finish.connect(self._update_files)
-        #     self.data_worker.signals.error.connect(
-        #         partial(self._handle_thread_exception, "Update Files")
-        #     )
-        #     self.threadpool.start(self.data_worker)
-
-    # def _update_files(self, *args):
-    #     pass
+        self._update_root_directory(update_selection=False)
 
     def _select_tomograms(self, action: str, *args):
         match action:
@@ -923,7 +917,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         """Override close event to save settings."""
-        # self.syncTimer.stop()
+        self.syncTimer.stop()
         self.settings_model.save_settings()
         event.accept()
 

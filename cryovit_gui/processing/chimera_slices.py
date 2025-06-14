@@ -32,9 +32,12 @@ def open_next_tomogram(session):
         for model in models:
             if isinstance(model, Volume):
                 x, y, z = model.data.size
+                region_str = ",".join(
+                    list(map(str, [0, 0, z // 2, x - 1, y - 1, z // 2]))
+                )
                 run(
                     session,
-                    f"volume {model.atomspec} style image region {','.join(list(map(str, [0, 0, z // 2, x - 1, y - 1, z // 2])))} step 1 showOutlineBox true",
+                    f"volume {model.atomspec} style image region {region_str} step 1 level -1,0 level 0,0.5 level 1,1 showOutlineBox true",
                 )
 
     except Exception as e:
@@ -42,7 +45,7 @@ def open_next_tomogram(session):
         return
 
 
-def save_to_csv(session):
+def save_to_csv(session, z_limits, slices):
     import csv
 
     global state_dict
@@ -57,10 +60,7 @@ def save_to_csv(session):
         session.logger.info(
             f"Couldn't read information from {state_dict['csv']}. Creating new file."
         )
-    # Get data from state_dict
-    z_limits = sorted([round(a.coord[2]) for a in state_dict["zlim_markers"].atoms])
-    z_limits[1] += 1  # Adjust for end exclusion
-    slices = sorted([round(a.coord[2]) for a in state_dict["slice_markers"].atoms])
+    # Add to csv data
     csv_data = {
         "tomo_name": state_dict["tomograms"][state_dict["cur_idx"]],
         "z_min": z_limits[0],
@@ -160,7 +160,17 @@ def next_tomogram(session):
         )
         return
 
-    save_to_csv(session)
+    # Check that markers are within z-limits
+    z_limits = sorted([round(a.coord[2]) for a in state_dict["zlim_markers"].atoms])
+    z_limits[1] += 1  # Adjust for end exclusion
+    slices = sorted([round(a.coord[2]) for a in state_dict["slice_markers"].atoms])
+    if any([s < z_limits[0] or s >= z_limits[1] for s in slices]):
+        session.logger.error(
+            f"Slice markers must be within z-limits {z_limits[0]} and {z_limits[1] - 1}. Current slices: {slices}."
+        )
+        return
+
+    save_to_csv(session, z_limits, slices)
     # Close tomogram
     close(session)
 

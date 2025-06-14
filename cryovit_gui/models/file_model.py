@@ -1,5 +1,6 @@
 """Define a base item model for tracking completed annotations for the CryoViT GUI application."""
 
+import os
 import pandas as pd
 
 from PyQt6.QtCore import (
@@ -31,12 +32,6 @@ class FileModel(QAbstractTableModel):
     def __init__(self):
         super().__init__()
         self._root_dir: Path = None
-        self._colors = [
-            QColor(*Colors.RED.value),
-            QColor(*Colors.DARK_ORANGE.value),
-            QColor(*Colors.ORANGE.value),
-            QColor(*Colors.YELLOW.value),
-        ]
 
         self.file_data: FileData = {}
 
@@ -57,10 +52,10 @@ class FileModel(QAbstractTableModel):
         ]
 
         if self._root_dir:
-            for subdir in required_directories:
+            for subdir in required_directories + optional_directories:
                 setattr(self, f"_{subdir}_dir", self._root_dir / subdir)
             self.file_data = self._read_data()
-            if update_selection and prev_data is not None:
+            if not update_selection and prev_data is not None:
                 for sample in self.file_data:
                     if sample in prev_data:
                         matching_idx = [
@@ -95,6 +90,8 @@ class FileModel(QAbstractTableModel):
                     f"Required subdirectory {subdir} does not exist in root directory {root_dir}."
                 )
                 return False
+        for subdir in optional_directories:
+            Path(root_dir / subdir).mkdir(exist_ok=True)
         return True
 
     def _read_data(self) -> FileData:
@@ -118,18 +115,41 @@ class FileModel(QAbstractTableModel):
             sample_csv = self._csv_dir / f"{sample}.csv"
             if not sample_csv.exists():
                 annotated = [False] * len(tomogram_files)
+                exported = [False] * len(tomogram_files)
             else:
                 sample_df = pd.read_csv(sample_csv)
                 annotated = [
                     not sample_df[sample_df["tomo_name"] == file.name].empty
                     for file in tomogram_files
                 ]
+                # Check export state
+                export_dir = self._annotations_dir / sample
+                exported_files = list(
+                    map(lambda x: str(x.stem), list(export_dir.glob("*")))
+                )
+                filtered_df = sample_df[
+                    sample_df["tomo_name"].isin([file.name for file in tomogram_files])
+                ]
+                filtered_names = filtered_df["tomo_name"].apply(
+                    lambda x: str(Path(x).stem)
+                )
+                slices_df = filtered_df.iloc[:, 3:]
+                slices_df = slices_df.apply(
+                    lambda col: filtered_names + "_" + col.astype(str)
+                )
+                slices_df = slices_df.applymap(lambda x: x in exported_files)
+                slices_df["exported"] = slices_df.all(axis=1)
+                exported = [
+                    (
+                        slices_df[filtered_df["tomo_name"] == file.name].iloc[0][
+                            "exported"
+                        ]
+                        if not slices_df[filtered_df["tomo_name"] == file.name].empty
+                        else False
+                    )
+                    for file in tomogram_files
+                ]
             selected = [not annot for annot in annotated]
-            # Check export state
-            export_dir = self._slices_dir / sample
-            exported = [
-                bool(list(export_dir.glob(f"*{file.stem}*")) for file in tomogram_files)
-            ]
             # Update the model data
             data[sample] = SampleData(
                 tomogram_files=tomogram_files,
@@ -142,8 +162,15 @@ class FileModel(QAbstractTableModel):
     def get_directory(self, subdir: str) -> Path:
         """Get the directory for the given subdirectory."""
         if subdir not in required_directories:
-            logger.warning(f"Subdirectory {subdir} is not a required subdirectory.")
-            return None
+            if subdir in optional_directories:
+                logger.info(
+                    f"Subdirectory {subdir} is optional. It will be created if not found."
+                )
+            else:
+                logger.warning(
+                    f"Subdirectory {subdir} is not a required or optional subdirectory."
+                )
+                return None
         result = getattr(self, f"_{subdir}_dir", None)
         if not result:
             logger.warning("Subdirectory not set. Returning None.")
@@ -155,13 +182,17 @@ class FileModel(QAbstractTableModel):
         match index.column():
             case 0:  # Sample Name
                 return flag | Qt.ItemFlag.ItemIsSelectable | Qt.ItemFlag.ItemIsEnabled
-            case 1:  # Percentage
-                return flag
-            case 2:  # Tomogram File
+            case 1:  # Tomo File
                 return (
                     flag | Qt.ItemFlag.ItemIsUserCheckable | Qt.ItemFlag.ItemIsEnabled
                 )
-            case 3:  # Exported
+            case 2:  # Slices
+                return flag
+            case 3:  # Annotations
+                return flag
+            case 4:  # Tomo Slices
+                return flag
+            case 5:  # Tomo Annotations
                 return flag
             case _:
                 return Qt.ItemFlag.NoItemFlags
@@ -175,7 +206,7 @@ class FileModel(QAbstractTableModel):
 
     def columnCount(self, parent: QModelIndex = QModelIndex()) -> int:
         """Return the number of columns for the given parent index."""
-        return 4  # Columns: Sample Name, Percentage, File Name, Exported
+        return 6  # Columns: Sample Name, Tomo File, Slices, Annotations, TomoSlices, TomoAnnotations
 
     def data(self, index: QModelIndex, role: int) -> QVariant:
         """Return the data for the given index and role."""
@@ -183,37 +214,24 @@ class FileModel(QAbstractTableModel):
         if sample == "" or tomogram_index == -1:  # No data found
             return QVariant()
         samples_annotated = sum(self.file_data[sample]["annotated"])
+        samples_exported = sum(self.file_data[sample]["exported"])
         total_samples = len(self.file_data[sample]["tomogram_files"])
-        percentage = round((samples_annotated / total_samples) * 100, 2)
-        background_color = (
-            self._colors[int(percentage // (100 // len(self._colors)))]
-            if percentage < 100
-            else QColor(*Colors.GREEN.value)
-        )
         match index.column():
             case 0:  # Sample Name
                 match role:
                     case Qt.ItemDataRole.DisplayRole:
-                        return QVariant(
-                            f"{sample} ({samples_annotated}/{total_samples})"
-                        )
+                        return QVariant(f"{sample}")
                     case Qt.ItemDataRole.BackgroundRole:
-                        return QBrush(background_color)
+                        if (
+                            samples_annotated == total_samples
+                            and samples_exported == total_samples
+                        ):
+                            return QBrush(QColor(*Colors.GREEN.value))
                     case Qt.ItemDataRole.UserRole:
                         return QVariant(sample)
                     case _:
                         return QVariant()
-            case 1:  # Percentage
-                match role:
-                    case Qt.ItemDataRole.DisplayRole:
-                        return QVariant(percentage)
-                    case Qt.ItemDataRole.BackgroundRole:
-                        return QBrush(background_color)
-                    case Qt.ItemDataRole.UserRole:
-                        return QVariant((samples_annotated, total_samples))
-                    case _:
-                        return QVariant()
-            case 2:  # Tomogram File
+            case 1:  # Tomogram File
                 match role:
                     case Qt.ItemDataRole.DisplayRole:
                         return QVariant(
@@ -222,7 +240,10 @@ class FileModel(QAbstractTableModel):
                             ].name
                         )
                     case Qt.ItemDataRole.BackgroundRole:
-                        if self.file_data[sample]["annotated"][tomogram_index]:
+                        if (
+                            self.file_data[sample]["annotated"][tomogram_index]
+                            and self.file_data[sample]["exported"][tomogram_index]
+                        ):
                             return QBrush(QColor(*Colors.GREEN.value))
                     case Qt.ItemDataRole.CheckStateRole:
                         return (
@@ -236,14 +257,62 @@ class FileModel(QAbstractTableModel):
                         )
                     case _:
                         return QVariant()
-            case 3:  # Exported
+            case 2:  # Slices exported
                 match role:
+                    case Qt.ItemDataRole.DisplayRole:
+                        return QVariant(f"{samples_annotated} / {total_samples}")
                     case Qt.ItemDataRole.BackgroundRole:
-                        return (
-                            QBrush(QColor(*Colors.GREEN.value))
-                            if all(self.file_data[sample]["exported"])
-                            else QBrush(QColor(*Colors.RED.value))
+                        if samples_annotated == total_samples:
+                            return QBrush(QColor(*Colors.GREEN.value))
+                    case Qt.ItemDataRole.TextAlignmentRole:
+                        return Qt.AlignmentFlag.AlignCenter
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant((samples_annotated, total_samples))
+                    case _:
+                        return QVariant()
+            case 3:  # Annotations exported
+                match role:
+                    case Qt.ItemDataRole.DisplayRole:
+                        return QVariant(f"{samples_exported} / {total_samples}")
+                    case Qt.ItemDataRole.BackgroundRole:
+                        if samples_exported == total_samples:
+                            return QBrush(QColor(*Colors.GREEN.value))
+                    case Qt.ItemDataRole.TextAlignmentRole:
+                        return Qt.AlignmentFlag.AlignCenter
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant((samples_exported, total_samples))
+                    case _:
+                        return QVariant()
+            case 4:  # Tomogram slices exported
+                match role:
+                    case Qt.ItemDataRole.DisplayRole:
+                        if self.file_data[sample]["annotated"][tomogram_index]:
+                            return QVariant("Yes")
+                        else:
+                            return QVariant("No")
+                    case Qt.ItemDataRole.BackgroundRole:
+                        if self.file_data[sample]["annotated"][tomogram_index]:
+                            return QBrush(QColor(*Colors.GREEN.value))
+                    case Qt.ItemDataRole.TextAlignmentRole:
+                        return Qt.AlignmentFlag.AlignCenter
+                    case Qt.ItemDataRole.UserRole:
+                        return QVariant(
+                            self.file_data[sample]["annotated"][tomogram_index]
                         )
+                    case _:
+                        return QVariant()
+            case 5:  # Tomogram annotations exported
+                match role:
+                    case Qt.ItemDataRole.DisplayRole:
+                        if self.file_data[sample]["exported"][tomogram_index]:
+                            return QVariant("Yes")
+                        else:
+                            return QVariant("No")
+                    case Qt.ItemDataRole.BackgroundRole:
+                        if self.file_data[sample]["exported"][tomogram_index]:
+                            return QBrush(QColor(*Colors.GREEN.value))
+                    case Qt.ItemDataRole.TextAlignmentRole:
+                        return Qt.AlignmentFlag.AlignCenter
                     case Qt.ItemDataRole.UserRole:
                         return QVariant(
                             self.file_data[sample]["exported"][tomogram_index]
@@ -293,11 +362,15 @@ class FileModel(QAbstractTableModel):
                 case 0:
                     return QVariant("Sample Name")
                 case 1:
-                    return QVariant("Percentage Done")
-                case 2:
                     return QVariant("Tomogram File")
+                case 2:
+                    return QVariant("Slice\nProgress")
                 case 3:
-                    return QVariant("Exported")
+                    return QVariant("Annotation\nProgress")
+                case 4:
+                    return QVariant("Slices\nexported?")
+                case 5:
+                    return QVariant("Annotations\nexported?")
                 case _:
                     return QVariant()
 
@@ -355,7 +428,7 @@ class SampleModel(QSortFilterProxyModel):
         self, source_column: int, source_parent: QModelIndex
     ) -> bool:
         """Filter columns based on the sample name."""
-        if source_column in [0, 1, 3]:
+        if source_column in [0, 2, 3]:
             return True
         else:
             return False
@@ -409,7 +482,11 @@ class TomogramModel(QSortFilterProxyModel):
         self, source_column: int, source_parent: QModelIndex
     ) -> bool:
         """Filter columns based on the sample name."""
-        if source_column == 2:  # Only Tomogram File column
+        if source_column in [
+            1,
+            4,
+            5,
+        ]:  # Only Tomogram File, Slice, and Annotation columns
             return True
         else:
             return False

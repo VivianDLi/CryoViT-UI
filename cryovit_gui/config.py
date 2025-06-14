@@ -54,6 +54,7 @@ FileData = Dict[str, SampleData]
 
 tomogram_exts = [".rec", ".mrc", ".hdf"]
 required_directories = ["tomograms", "csv", "slices"]
+optional_directories = ["annotations"]
 
 # CryoViT commands
 preprocess_command = "cryovit.preprocess"
