@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>900</height>
+    <width>800</width>
+    <height>1200</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -44,675 +44,522 @@ color: rgb(20, 20, 20);</string>
      <number>0</number>
     </property>
     <item>
-     <widget class="QFrame" name="sampleSelectFrame">
-      <property name="frameShape">
-       <enum>QFrame::Shape::NoFrame</enum>
-      </property>
-      <property name="frameShadow">
-       <enum>QFrame::Shadow::Plain</enum>
-      </property>
-      <property name="lineWidth">
-       <number>0</number>
-      </property>
-      <layout class="QHBoxLayout" name="sampleSelectLayout">
-       <property name="leftMargin">
-        <number>9</number>
-       </property>
-       <property name="topMargin">
-        <number>9</number>
-       </property>
-       <property name="rightMargin">
-        <number>9</number>
-       </property>
-       <property name="bottomMargin">
-        <number>9</number>
-       </property>
-       <item>
-        <widget class="QLabel" name="sampleSelectLabel">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Training Samples:</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QComboBox" name="sampleSelectCombo">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Samples to use for training. If none are selected, tomograms in the &lt;span style=&quot; font-weight:700;&quot;&gt;Raw Tomogram Directory &lt;/span&gt;will be used, and the directory folder name will be taken as the sample name.&lt;/p&gt;&lt;p&gt;New samples can be added to the list either by &lt;span style=&quot; font-weight:700;&quot;&gt;typing&lt;/span&gt;, or with the &lt;span style=&quot; font-weight:700;&quot;&gt;button&lt;/span&gt; on the &lt;span style=&quot; font-weight:700;&quot;&gt;right&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;Samples can be removed from the list by &lt;span style=&quot; font-weight:700;&quot;&gt;right-clicking&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="editable">
-          <bool>false</bool>
-         </property>
-         <property name="insertPolicy">
-          <enum>QComboBox::InsertPolicy::InsertAlphabetically</enum>
-         </property>
-         <property name="placeholderText">
-          <string>select samples to use for training</string>
-         </property>
-        </widget>
-       </item>
-       <item>
-        <widget class="QToolButton" name="sampleAdd">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="icon">
-          <iconset resource="resources.qrc">
-           <normaloff>:/icons/add.svg</normaloff>:/icons/add.svg</iconset>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item>
-     <widget class="QGroupBox" name="processGroup">
-      <property name="title">
-       <string>Pre-processing</string>
-      </property>
-      <layout class="QGridLayout" name="gridLayout_6">
-       <item row="0" column="0" colspan="2">
-        <widget class="QLabel" name="rawDirectoryLabel">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Raw Tomogram Directory:</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="2">
-        <widget class="QLineEdit" name="rawDirectory">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The &lt;span style=&quot; font-weight:700;&quot;&gt;raw tomogram&lt;/span&gt; directory.&lt;/p&gt;&lt;p&gt;If &lt;span style=&quot; font-weight:700;&quot;&gt;Training Samples&lt;/span&gt; are selected, this contains &lt;span style=&quot; font-weight:700;&quot;&gt;sample&lt;/span&gt; folders.&lt;/p&gt;&lt;p&gt;If no samples are selected, this contains tomogram files.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="frame">
-          <bool>true</bool>
-         </property>
-         <property name="placeholderText">
-          <string>/path/to/directory/with/raw/samples</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="3">
-        <widget class="QToolButton" name="rawSelect">
-         <property name="text">
-          <string/>
-         </property>
-         <property name="icon">
-          <iconset resource="resources.qrc">
-           <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-         </property>
-         <property name="popupMode">
-          <enum>QToolButton::ToolButtonPopupMode::DelayedPopup</enum>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="0">
-        <widget class="QCheckBox" name="replaceCheckboxProc">
-         <property name="toolTip">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the pre-processed data to the existing tomogram under the &lt;span style=&quot; font-weight:700;&quot;&gt;[data]&lt;/span&gt; dataset.&lt;/p&gt;&lt;p&gt;If not, specify a results directory to copy pre-processed tomograms to.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-         </property>
-         <property name="text">
-          <string>Replace?</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="1">
-        <widget class="QLabel" name="replaceDirectoryLabelProc">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
-         <property name="text">
-          <string>Directory:</string>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="2">
-        <widget class="QLineEdit" name="replaceDirectoryProc">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
-         <property name="placeholderText">
-          <string>/path/to/directory/with/processed/samples</string>
-         </property>
-        </widget>
-       </item>
-       <item row="1" column="3">
-        <widget class="QToolButton" name="replaceSelectProc">
-         <property name="enabled">
-          <bool>true</bool>
-         </property>
-         <property name="text">
-          <string/>
-         </property>
-         <property name="icon">
-          <iconset resource="resources.qrc">
-           <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0" colspan="4">
-        <widget class="QPushButton" name="processButtonSeg">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="text">
-          <string>Run Pre-processing</string>
-         </property>
-        </widget>
-       </item>
-      </layout>
-     </widget>
-    </item>
-    <item>
      <widget class="QTabWidget" name="modeTabs">
+      <property name="font">
+       <font>
+        <pointsize>10</pointsize>
+       </font>
+      </property>
       <property name="currentIndex">
        <number>0</number>
       </property>
-      <widget class="QWidget" name="segmentTab">
+      <property name="tabBarAutoHide">
+       <bool>false</bool>
+      </property>
+      <widget class="QWidget" name="processTab">
        <attribute name="title">
-        <string>Segment Tomograms</string>
+        <string>1. Pre-processing</string>
        </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_2">
+       <layout class="QVBoxLayout" name="verticalLayout_6">
         <item>
-         <widget class="QGroupBox" name="segGroup">
+         <widget class="QTreeView" name="processView"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="processButton">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>50</height>
+           </size>
+          </property>
           <property name="font">
            <font>
-            <pointsize>9</pointsize>
+            <pointsize>12</pointsize>
            </font>
           </property>
-          <property name="title">
-           <string>Segmentation</string>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run pre-processing based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
-          <layout class="QGridLayout" name="gridLayout_2">
-           <item row="2" column="1" colspan="7">
-            <widget class="QComboBox" name="modelCombo">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
+          <property name="text">
+           <string>Generate Command</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="annotTab">
+       <attribute name="title">
+        <string>2. Annotation</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_5">
+        <item>
+         <widget class="QFrame" name="directoryFrame">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="frameShape">
+           <enum>QFrame::Shape::StyledPanel</enum>
+          </property>
+          <property name="frameShadow">
+           <enum>QFrame::Shadow::Raised</enum>
+          </property>
+          <layout class="QHBoxLayout" name="horizontalLayout_2">
+           <item>
+            <widget class="QLabel" name="projectDirectoryLabel">
+             <property name="font">
+              <font>
+               <pointsize>10</pointsize>
+              </font>
              </property>
-             <property name="placeholderText">
-              <string>select models to use for segmentation</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="4" colspan="7">
-            <widget class="QGroupBox" name="modelInfoBox">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="title">
-              <string>Selected Models:</string>
-             </property>
-             <layout class="QHBoxLayout" name="horizontalLayout">
-              <property name="spacing">
-               <number>0</number>
-              </property>
-              <property name="leftMargin">
-               <number>0</number>
-              </property>
-              <property name="topMargin">
-               <number>0</number>
-              </property>
-              <property name="rightMargin">
-               <number>0</number>
-              </property>
-              <property name="bottomMargin">
-               <number>0</number>
-              </property>
-              <item>
-               <widget class="QTabWidget" name="modelTabs"/>
-              </item>
-             </layout>
-            </widget>
-           </item>
-           <item row="2" column="9">
-            <widget class="QToolButton" name="addModelButton">
              <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the current model (on the left) to the list of models to run.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The location of the project root directory. This has the following file structure layout:&lt;/p&gt;&lt;p&gt;&amp;gt; Project Root&lt;/p&gt;&lt;p&gt;	&amp;gt; Tomograms&lt;/p&gt;&lt;p&gt;		&amp;gt; Sample 1&lt;/p&gt;&lt;p&gt;			&amp;gt; *.hdf&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; csvs&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; slices&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; Annotations (optional)&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/add.svg</normaloff>:/icons/add.svg</iconset>
+              <string>Project Root Directory:</string>
              </property>
             </widget>
            </item>
-           <item row="3" column="0" colspan="4">
-            <widget class="QScrollArea" name="selectedModelArea">
+           <item>
+            <widget class="QLineEdit" name="projectDirectory">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="font">
+              <font>
+               <pointsize>10</pointsize>
+              </font>
+             </property>
+             <property name="placeholderText">
+              <string>/path/to/the/project/root/directory</string>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QToolButton" name="directoryButton">
              <property name="sizePolicy">
               <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
-             <property name="toolTip">
-              <string>Config for the currently selected model.</string>
-             </property>
-             <property name="widgetResizable">
-              <bool>true</bool>
-             </property>
-             <widget class="QWidget" name="selectedModelScroll">
-              <property name="geometry">
-               <rect>
-                <x>0</x>
-                <y>0</y>
-                <width>237</width>
-                <height>250</height>
-               </rect>
-              </property>
-              <layout class="QFormLayout" name="formLayout_4">
-               <item row="0" column="0">
-                <widget class="QLabel" name="nameLabelCurrent">
-                 <property name="text">
-                  <string>Model Name:</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="0" column="1">
-                <widget class="QLabel" name="nameDisplayCurrent">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="0">
-                <widget class="QLabel" name="archLabelCurrent">
-                 <property name="toolTip">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The architecture of the model (determines general model capabilities).&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
-                 <property name="text">
-                  <string>Model Architecture:</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="1" column="1">
-                <widget class="QLabel" name="archDisplayCurrent">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="0">
-                <widget class="QLabel" name="sampleLabelCurrent">
-                 <property name="toolTip">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The dataset the model was trained on.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
-                 <property name="text">
-                  <string>Dataset Samples:</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="2" column="1">
-                <widget class="QLabel" name="sampleDisplayCurrent">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="0">
-                <widget class="QLabel" name="segmentLabelCurrent">
-                 <property name="toolTip">
-                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;What label (e.g., mitochondria, christae) the model is trained to segment.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-                 </property>
-                 <property name="text">
-                  <string>Segmentation Label:</string>
-                 </property>
-                </widget>
-               </item>
-               <item row="3" column="1">
-                <widget class="QLabel" name="segmentDisplayCurrent">
-                 <property name="text">
-                  <string/>
-                 </property>
-                </widget>
-               </item>
-              </layout>
-             </widget>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="dataDirectoryLabel">
-             <property name="text">
-              <string>Data Directory:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="8">
-            <widget class="QToolButton" name="importModelButton">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Import a pre-training model from a &lt;span style=&quot; font-weight:700;&quot;&gt;.pt&lt;/span&gt; weights file.&lt;/p&gt;&lt;p&gt;After selecting the &lt;span style=&quot; font-weight:700;&quot;&gt;.pt&lt;/span&gt; file, a dialogue box will ask for model information, including an identifying name, the model architecture, and the dataset it was trained on.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="0" colspan="11">
-            <widget class="QPushButton" name="segmentButton">
-             <property name="font">
-              <font>
-               <pointsize>10</pointsize>
-              </font>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generate segmentations for tomograms. If multiple models are selected, the results of each model will appear as a separate dataset in the tomogram named &lt;span style=&quot; font-weight:700;&quot;&gt;[model_name]_[feature]&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Segment Tomograms</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="10">
-            <widget class="QToolButton" name="removeModelButton">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Remove the current model shown under &lt;span style=&quot; font-weight:700;&quot;&gt;Selected Models&lt;/span&gt; from the list of models to run.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/remove.svg</normaloff>:/icons/remove.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="1" colspan="9">
-            <widget class="QLineEdit" name="dataDirectory">
-             <property name="placeholderText">
-              <string>/path/to/directory/with/data/features</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="10">
-            <widget class="QToolButton" name="dataSelect">
              <property name="text">
               <string/>
              </property>
              <property name="icon">
               <iconset resource="resources.qrc">
                <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="modelLabel">
-             <property name="text">
-              <string>Model:</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="QCheckBox" name="replaceCheckboxSeg">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add the segmentation results to the existing tomograms.&lt;/p&gt;&lt;p&gt;If not, specify a results directory to copy resulting tomograms to.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Replace?</string>
-             </property>
-             <property name="checked">
-              <bool>true</bool>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1">
-            <widget class="QLabel" name="replaceDirectoryLabelSeg">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="text">
-              <string>Directory:</string>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="10">
-            <widget class="QToolButton" name="replaceSelectSeg">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="2" colspan="8">
-            <widget class="QLineEdit" name="replaceDirectorySeg">
-             <property name="enabled">
-              <bool>true</bool>
-             </property>
-             <property name="placeholderText">
-              <string>/path/to/result/directory</string>
              </property>
             </widget>
            </item>
           </layout>
          </widget>
         </item>
-       </layout>
-      </widget>
-      <widget class="QWidget" name="trainingTab">
-       <attribute name="title">
-        <string>Train Model</string>
-       </attribute>
-       <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
          <widget class="QGroupBox" name="annotGroup">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
           <property name="font">
            <font>
-            <pointsize>9</pointsize>
+            <pointsize>12</pointsize>
            </font>
           </property>
           <property name="title">
            <string>Annotations</string>
           </property>
-          <layout class="QGridLayout" name="gridLayout_4">
-           <item row="5" column="1">
-            <widget class="QLineEdit" name="featuresDisplay">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <property name="alignment">
+           <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_9">
+           <property name="topMargin">
+            <number>11</number>
+           </property>
+           <property name="bottomMargin">
+            <number>11</number>
+           </property>
+           <item>
+            <widget class="QLabel" name="syncIcon">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
              </property>
-             <property name="placeholderText">
-              <string>list features labeled in order of decreasing annotation value</string>
+             <property name="minimumSize">
+              <size>
+               <width>20</width>
+               <height>20</height>
+              </size>
+             </property>
+             <property name="layoutDirection">
+              <enum>Qt::LayoutDirection::LeftToRight</enum>
+             </property>
+             <property name="text">
+              <string/>
+             </property>
+             <property name="textFormat">
+              <enum>Qt::TextFormat::PlainText</enum>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
              </property>
             </widget>
            </item>
-           <item row="7" column="0" colspan="3">
-            <widget class="QPushButton" name="splitsButtonNew">
+           <item>
+            <widget class="QLabel" name="selectLabel">
              <property name="font">
               <font>
                <pointsize>10</pointsize>
               </font>
              </property>
              <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Create new training splits given an existing &lt;span style=&quot; font-weight:700;&quot;&gt;splits.csv&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="text">
-              <string>Generate New Training Splits</string>
+              <string>File Selection Progress:</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="csvDirectoryLabel">
-             <property name="text">
-              <string>.CSV Directory:</string>
+           <item>
+            <widget class="QTableView" name="sampleView">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
              </property>
             </widget>
            </item>
-           <item row="4" column="0">
-            <widget class="QLabel" name="annoDirectoryLabel">
-             <property name="text">
-              <string>Annotation Directory:</string>
+           <item>
+            <widget class="QFrame" name="frame">
+             <property name="layoutDirection">
+              <enum>Qt::LayoutDirection::LeftToRight</enum>
+             </property>
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_3">
+              <item>
+               <spacer name="horizontalSpacer">
+                <property name="orientation">
+                 <enum>Qt::Orientation::Horizontal</enum>
+                </property>
+                <property name="sizeHint" stdset="0">
+                 <size>
+                  <width>40</width>
+                  <height>20</height>
+                 </size>
+                </property>
+               </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="selectAllButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Select All</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="deselectAllButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="text">
+                 <string>Deselect All</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="resetDefaultButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Fixed" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="layoutDirection">
+                 <enum>Qt::LayoutDirection::LeftToRight</enum>
+                </property>
+                <property name="text">
+                 <string>Reset to Default</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="QTableView" name="fileView">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>0</height>
+              </size>
              </property>
             </widget>
            </item>
-           <item row="2" column="0">
-            <widget class="QLabel" name="sliceDirectoryLabel">
-             <property name="text">
-              <string>Slice Directory:</string>
+           <item>
+            <widget class="QFrame" name="frame_2">
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
+             </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout">
+              <item>
+               <widget class="QPushButton" name="chimeraButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>12</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Launches &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX&lt;/span&gt; to select slices to annotate.&lt;/p&gt;&lt;p&gt;The path to &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX.exe&lt;/span&gt; must be specified in File &amp;gt; Settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Launch ChimeraX</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="slicesButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="maximumSize">
+                 <size>
+                  <width>16777215</width>
+                  <height>50</height>
+                 </size>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>12</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Extracts previously-marked slices to the slice directory for further segmentation in &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;. These are saved in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/slices&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Extract Slices</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </widget>
+           </item>
+           <item>
+            <widget class="Line" name="line">
+             <property name="orientation">
+              <enum>Qt::Orientation::Horizontal</enum>
              </property>
             </widget>
            </item>
-           <item row="5" column="0">
-            <widget class="QLabel" name="featuresLabel">
-             <property name="text">
-              <string>Labeled Features:</string>
+           <item>
+            <widget class="QFrame" name="frame_3">
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
              </property>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
+             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <item>
+               <widget class="QLabel" name="featuresLabel">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>10</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string>Labeled Features:</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QLineEdit" name="featuresDisplay">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="font">
+                 <font>
+                  <pointsize>10</pointsize>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="placeholderText">
+                 <string>list features labeled in order of decreasing annotation value</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QToolButton" name="featuresButton">
+                <property name="sizePolicy">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+                  <horstretch>0</horstretch>
+                  <verstretch>0</verstretch>
+                 </sizepolicy>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="text">
+                 <string/>
+                </property>
+                <property name="icon">
+                 <iconset resource="resources.qrc">
+                  <normaloff>:/icons/file.svg</normaloff>:/icons/file.svg</iconset>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </widget>
            </item>
-           <item row="3" column="0" colspan="3">
-            <widget class="QPushButton" name="chimeraButton">
+           <item>
+            <widget class="QPushButton" name="annotButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>50</height>
+              </size>
+             </property>
              <property name="font">
               <font>
-               <pointsize>10</pointsize>
+               <pointsize>12</pointsize>
               </font>
              </property>
              <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Launches &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX&lt;/span&gt; with script to select and export slices to annotate.&lt;/p&gt;&lt;p&gt;The path to &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX.exe&lt;/span&gt; must be specified in File &amp;gt; Settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read finished annotations and add them to tomograms in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/Tomograms&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
              </property>
              <property name="text">
-              <string>Launch ChimeraX</string>
+              <string>Add Annotations</string>
              </property>
             </widget>
            </item>
-           <item row="1" column="1">
-            <widget class="QLineEdit" name="csvDirectory">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The directory where all .csv files, including &lt;span style=&quot; font-weight:700;&quot;&gt;sample.csv&lt;/span&gt; and &lt;span style=&quot; font-weight:700;&quot;&gt;splits.csv&lt;/span&gt; are located.&lt;/p&gt;&lt;p&gt;If not provided, defaults to &lt;span style=&quot; font-weight:700;&quot;&gt;src_dir/../csv/&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="placeholderText">
-              <string>/path/to/directory/with/csv/files</string>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="1">
-            <widget class="QLineEdit" name="sliceDirectory">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The directory to save tomogram slices to manually segment for ground truth labels as &lt;span style=&quot; font-weight:700;&quot;&gt;.pngs&lt;/span&gt;.&lt;/p&gt;&lt;p&gt;If not provided, defaults to &lt;span style=&quot; font-weight:700;&quot;&gt;src_dir/../slices/sample&lt;/span&gt; or &lt;span style=&quot; font-weight:700;&quot;&gt;src_dir/../slices/&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="placeholderText">
-              <string>/path/to/directory/with/png/slices</string>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="1">
-            <widget class="QLineEdit" name="annoDirectory">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The directory where annotations are located.&lt;/p&gt;&lt;p&gt;Annotations are &lt;span style=&quot; font-weight:700;&quot;&gt;.png&lt;/span&gt; files where different segmentations are represented as decreasing pixel values.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="placeholderText">
-              <string>/path/to/directory/with/annotations</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="2">
-            <widget class="QToolButton" name="csvSelect">
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="5" column="2">
-            <widget class="QToolButton" name="featuresAdd">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/add.svg</normaloff>:/icons/add.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="2">
-            <widget class="QToolButton" name="sliceSelect">
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="2">
-            <widget class="QToolButton" name="dataSelectTrain">
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="4" column="2">
-            <widget class="QToolButton" name="annoSelect">
-             <property name="toolTip">
-              <string/>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/open_folder.svg</normaloff>:/icons/open_folder.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="6" column="0" colspan="3">
+          </layout>
+         </widget>
+        </item>
+        <item>
+         <widget class="QGroupBox" name="splitsGroup">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
+          <property name="title">
+           <string>Training Splits</string>
+          </property>
+          <layout class="QVBoxLayout" name="verticalLayout_8">
+           <item>
             <widget class="QPushButton" name="splitsButton">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>50</height>
+              </size>
+             </property>
              <property name="font">
               <font>
-               <pointsize>10</pointsize>
+               <pointsize>12</pointsize>
               </font>
              </property>
              <property name="toolTip">
@@ -723,133 +570,118 @@ color: rgb(20, 20, 20);</string>
              </property>
             </widget>
            </item>
-           <item row="0" column="1">
-            <widget class="QLineEdit" name="dataDirectoryTrain">
-             <property name="placeholderText">
-              <string>/path/to/directory/with/processed/samples</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="dataDirectoryLabelTrain">
-             <property name="text">
-              <string>Data Directory:</string>
-             </property>
-            </widget>
-           </item>
           </layout>
          </widget>
         </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="trainTab">
+       <attribute name="title">
+        <string>3. Training</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QGroupBox" name="trainGroup">
+         <widget class="QTreeView" name="trainView"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="trainButton">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>50</height>
+           </size>
+          </property>
           <property name="font">
            <font>
-            <pointsize>9</pointsize>
-            <bold>false</bold>
+            <pointsize>12</pointsize>
            </font>
           </property>
-          <property name="contextMenuPolicy">
-           <enum>Qt::ContextMenuPolicy::DefaultContextMenu</enum>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run training based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
           </property>
-          <property name="title">
-           <string>Training</string>
+          <property name="text">
+           <string>Generate Command</string>
           </property>
-          <layout class="QGridLayout" name="gridLayout_5">
-           <item row="0" column="1">
-            <widget class="QComboBox" name="modelComboTrain">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="toolTip">
-              <string/>
-             </property>
-             <property name="placeholderText">
-              <string>select a model architecture to train with</string>
-             </property>
-            </widget>
-           </item>
-           <item row="3" column="0" colspan="3">
-            <widget class="QPushButton" name="trainButton">
-             <property name="font">
-              <font>
-               <pointsize>10</pointsize>
-              </font>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Start training the given model with the given training setup.&lt;/p&gt;&lt;p&gt;Progress can be tracked in the &lt;span style=&quot; font-weight:700;&quot;&gt;Console&lt;/span&gt; and through the progress bar.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>Train Model</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="0">
-            <widget class="QLabel" name="modelLabelTrain">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Model:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="0">
-            <widget class="QLabel" name="labelLabel">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="text">
-              <string>Label:</string>
-             </property>
-            </widget>
-           </item>
-           <item row="1" column="1" colspan="2">
-            <widget class="QComboBox" name="labelCombo">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
-             </property>
-             <property name="toolTip">
-              <string/>
-             </property>
-             <property name="placeholderText">
-              <string>select a label to train for from annotations</string>
-             </property>
-            </widget>
-           </item>
-           <item row="0" column="2">
-            <widget class="QToolButton" name="modelSettings">
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;View and change the model's paremeters and training setup.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="icon">
-              <iconset resource="resources.qrc">
-               <normaloff>:/icons/wrench.svg</normaloff>:/icons/wrench.svg</iconset>
-             </property>
-            </widget>
-           </item>
-           <item row="2" column="0" colspan="3">
-            <widget class="QPushButton" name="featureButtonTrain">
-             <property name="text">
-              <string>Calculate Features</string>
-             </property>
-            </widget>
-           </item>
-          </layout>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="evalTab">
+       <attribute name="title">
+        <string>4. Evaluation</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_4">
+        <item>
+         <widget class="QTreeView" name="evalView"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="evalButton">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>50</height>
+           </size>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run evaluation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Generate Command</string>
+          </property>
+         </widget>
+        </item>
+       </layout>
+      </widget>
+      <widget class="QWidget" name="segmentTab">
+       <attribute name="title">
+        <string>5. Segmentation</string>
+       </attribute>
+       <layout class="QVBoxLayout" name="verticalLayout_7">
+        <item>
+         <widget class="QTreeView" name="segmentView"/>
+        </item>
+        <item>
+         <widget class="QPushButton" name="segmentButton">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="maximumSize">
+           <size>
+            <width>16777215</width>
+            <height>50</height>
+           </size>
+          </property>
+          <property name="font">
+           <font>
+            <pointsize>12</pointsize>
+           </font>
+          </property>
+          <property name="toolTip">
+           <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run segmentation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="text">
+           <string>Generate Command</string>
+          </property>
          </widget>
         </item>
        </layout>
@@ -857,11 +689,42 @@ color: rgb(20, 20, 20);</string>
      </widget>
     </item>
     <item>
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Orientation::Vertical</enum>
+      </property>
+      <property name="sizeType">
+       <enum>QSizePolicy::Policy::Preferred</enum>
+      </property>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>10</height>
+       </size>
+      </property>
+     </spacer>
+    </item>
+    <item>
      <widget class="QGroupBox" name="consoleBox">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>200</height>
+       </size>
+      </property>
       <property name="font">
        <font>
-        <pointsize>9</pointsize>
+        <pointsize>12</pointsize>
        </font>
+      </property>
+      <property name="focusPolicy">
+       <enum>Qt::FocusPolicy::ClickFocus</enum>
       </property>
       <property name="title">
        <string>Console</string>
@@ -890,10 +753,22 @@ color: rgb(20, 20, 20);</string>
            <verstretch>0</verstretch>
           </sizepolicy>
          </property>
+         <property name="font">
+          <font>
+           <family>Segoe UI</family>
+           <pointsize>10</pointsize>
+           <italic>false</italic>
+           <bold>false</bold>
+          </font>
+         </property>
+         <property name="acceptDrops">
+          <bool>false</bool>
+         </property>
          <property name="styleSheet">
           <string notr="true">background-color: rgb(90, 90, 90);
 color: rgb(255, 255, 255);
-border-color: rgb(90, 90, 90);</string>
+border-color: rgb(90, 90, 90);
+font: 10pt &quot;Segoe UI&quot;;</string>
          </property>
          <property name="frameShape">
           <enum>QFrame::Shape::WinPanel</enum>
@@ -915,33 +790,6 @@ border-color: rgb(90, 90, 90);</string>
          </property>
         </widget>
        </item>
-       <item>
-        <widget class="QProgressBar" name="progressBar">
-         <property name="font">
-          <font>
-           <pointsize>10</pointsize>
-          </font>
-         </property>
-         <property name="value">
-          <number>0</number>
-         </property>
-         <property name="alignment">
-          <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignVCenter</set>
-         </property>
-         <property name="textVisible">
-          <bool>true</bool>
-         </property>
-         <property name="orientation">
-          <enum>Qt::Orientation::Horizontal</enum>
-         </property>
-         <property name="invertedAppearance">
-          <bool>false</bool>
-         </property>
-         <property name="textDirection">
-          <enum>QProgressBar::Direction::TopToBottom</enum>
-         </property>
-        </widget>
-       </item>
       </layout>
      </widget>
     </item>
@@ -953,8 +801,8 @@ border-color: rgb(90, 90, 90);</string>
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>600</width>
-     <height>21</height>
+     <width>800</width>
+     <height>25</height>
     </rect>
    </property>
    <property name="autoFillBackground">
@@ -1180,17 +1028,9 @@ border-color: rgb(90, 90, 90);</string>
      <string>Tools</string>
     </property>
     <addaction name="actionDirectory_Setup"/>
-    <addaction name="actionGenerate_New_Training_Splits"/>
-   </widget>
-   <widget class="QMenu" name="menuRun">
-    <property name="title">
-     <string>Run</string>
-    </property>
-    <addaction name="use_local_training"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools"/>
-   <addaction name="menuRun"/>
    <addaction name="menuHelp"/>
   </widget>
   <action name="actionSettings">
@@ -1275,7 +1115,7 @@ border-color: rgb(90, 90, 90);</string>
     <string>Run Locally</string>
    </property>
   </action>
-  <action name="actionGenerate_New_Training_Splits">
+  <action name="action_2">
    <property name="text">
     <string>Generate New Training Splits</string>
    </property>

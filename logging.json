@@ -1,0 +1,61 @@
+{
+    "version": 1,
+    "disable_existing_loggers": false,
+    "formatters": {
+        "simple": {
+            "format": "[%(asctime)s] %(levelname)-8s: %(message)s",
+            "datefmt": "%H:%M:%S"
+        },
+        "detailed": {
+            "format": "[%(asctime)s] %(name)s:%(levelname)s:%(lineno)d: %(message)s"
+        }
+    },
+    "filters": {
+        "warnings_and_below": {
+            "()": "cryovit_gui.utils.filter_maker",
+            "level": "WARNING"
+        }
+    },
+    "handlers": {
+        "stdout": {
+            "class": "logging.StreamHandler",
+            "level": "INFO",
+            "formatter": "simple",
+            "stream": "ext://sys.stdout",
+            "filters": [
+                "warnings_and_below"
+            ]
+        },
+        "stderr": {
+            "class": "logging.StreamHandler",
+            "level": "ERROR",
+            "formatter": "simple",
+            "stream": "ext://sys.stderr"
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "level": "DEBUG",
+            "formatter": "detailed",
+            "filename": "app.log",
+            "mode": "w"
+        }
+    },
+    "loggers": {
+        "cryovit": {
+            "level": "INFO",
+            "handlers": [
+                "stdout",
+                "stderr",
+                "file"
+            ],
+            "propagate": true
+        },
+        "debug": {
+            "level": "DEBUG",
+            "handlers": [
+                "file"
+            ],
+            "propagate": false
+        }
+    }
+}
