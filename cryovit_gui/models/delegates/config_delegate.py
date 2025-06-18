@@ -15,7 +15,7 @@ from PyQt6.QtGui import QRegularExpressionValidator
 
 from cryovit_gui.config import ConfigInputType, ConfigField
 from cryovit_gui.models import ConfigModel
-from cryovit_gui.gui.clickable_file import ClickableFileSelect
+from cryovit_gui.gui.clickable_line import ClickableLineEdit
 from cryovit_gui.utils import select_file_folder_dialog
 
 #### Logging Setup ####
@@ -40,9 +40,27 @@ class ConfigDelegate(QStyledItemDelegate):
 
         match config_field.input_type:
             case ConfigInputType.FILE:
-                editor = ClickableFileSelect(config_field.name, False, parent=parent)
+                editor = ClickableLineEdit(parent=parent)
+                editor.clicked.connect(
+                    partial(
+                        self._open_file_folder_dialog,
+                        parent,
+                        index,
+                        config_field.name,
+                        False,
+                    )
+                )
             case ConfigInputType.DIRECTORY:
-                editor = ClickableFileSelect(config_field.name, True, parent=parent)
+                editor = ClickableLineEdit(parent=parent)
+                editor.clicked.connect(
+                    partial(
+                        self._open_file_folder_dialog,
+                        parent,
+                        index,
+                        config_field.name,
+                        True,
+                    )
+                )
             case ConfigInputType.TEXT:
                 editor = QLineEdit(parent=parent)
             case ConfigInputType.NUMBER:
@@ -99,3 +117,16 @@ class ConfigDelegate(QStyledItemDelegate):
 
         # Notify the model that the data has changed
         model.dataChanged.emit(index, index)
+
+    def _open_file_folder_dialog(
+        self, parent: QWidget, index: QModelIndex, title: str, is_directory: bool
+    ):
+        """Open a file or folder dialog and update the model with the selected path."""
+        config_field: ConfigField = index.data(Qt.ItemDataRole.UserRole)
+
+        selected_path = select_file_folder_dialog(parent, title, is_folder=is_directory)
+
+        if selected_path:
+            config_field.set_value(selected_path, from_str=True)
+            model: ConfigModel = index.model()
+            model.dataChanged.emit(index, index)
