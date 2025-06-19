@@ -4,7 +4,6 @@ import os
 import sys
 import platform
 import traceback
-from copy import copy
 from typing import List, Tuple
 from pathlib import Path
 import shutil
@@ -31,14 +30,13 @@ from PyQt6.QtCore import (
     QObject,
     pyqtSignal,
 )
-from PyQt6.QtGui import QDesktopServices, QGuiApplication
+from PyQt6.QtGui import QDesktopServices, QGuiApplication, QIcon
 
 import cryovit_gui.resources
 from cryovit_gui.layouts.mainwindow import Ui_MainWindow
 from cryovit_gui.gui import PresetDialog, SettingsWindow
 from cryovit_gui.config import (
     ConfigKey,
-    FileData,
     tomogram_exts,
     preprocess_command,
     train_command,
@@ -67,8 +65,20 @@ from cryovit_gui.processing import (
     generate_slices,
     generate_training_splits,
     get_all_tomogram_files,
-    chimera_script_path,
 )
+
+
+#### App Setup ####
+base_dir = Path(__file__).resolve().parent
+
+# Setup Windows
+try:
+    from ctypes import windll
+
+    app_id = "edu.stanford.cryovit.1"
+    windll.shell32.SetCurrentProcessExplicitAppUserModelID(app_id)
+except ImportError:
+    pass
 
 #### Logging Setup ####
 
@@ -76,7 +86,7 @@ import logging
 import logging.config
 import json
 
-with open("logging.json", "r") as f:
+with open(base_dir / "logging.json", "r") as f:
     logging.config.dictConfig(json.load(f))
 logger = logging.getLogger("cryovit")
 debug_logger = logging.getLogger("debug")
@@ -431,10 +441,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.chimera_process is not None:
             logger.warning("ChimeraX process already running.")
             return None, None  # ChimeraX process already running
+        chimera_script_path = base_dir / "scripts" / "chimera_slices.py"
         # Create script args
         commands = [
             "open",
-            chimera_script_path,
+            str(chimera_script_path),
             ";",
             "start selection",
             str(tomogram_dir.resolve()),
@@ -933,6 +944,7 @@ if __name__ == "__main__":
     app.setOrganizationName("Stanford University")
     app.setOrganizationDomain("stanford.edu")
     app.setStyle("Fusion")
+    app.setWindowIcon(QIcon(str(base_dir / "icons" / "cryovit.png")))
 
     window = MainWindow()
     window.show()

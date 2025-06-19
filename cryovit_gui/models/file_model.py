@@ -1,6 +1,6 @@
 """Define a base item model for tracking completed annotations for the CryoViT GUI application."""
 
-import os
+from pathlib import Path
 import pandas as pd
 
 from PyQt6.QtCore import (
@@ -12,7 +12,14 @@ from PyQt6.QtCore import (
 )
 from PyQt6.QtGui import QBrush, QColor
 
-from cryovit_gui.config import *
+from cryovit_gui.config import (
+    FileData,
+    SampleData,
+    Colors,
+    required_directories,
+    optional_directories,
+    tomogram_exts,
+)
 
 #### Logging Setup ####
 

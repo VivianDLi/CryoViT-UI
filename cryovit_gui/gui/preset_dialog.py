@@ -4,8 +4,6 @@ from PyQt6.QtWidgets import QDialog, QMessageBox, QDialogButtonBox
 
 import cryovit_gui.resources
 from cryovit_gui.layouts.presetdialog import Ui_Dialog
-from cryovit_gui.config import ConfigKey
-from cryovit_gui.models import SettingsModel
 
 #### Setup logging ####
 import logging
