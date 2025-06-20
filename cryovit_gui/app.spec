@@ -48,3 +48,12 @@ coll = COLLECT(
     upx_exclude=[],
     name="CryoViT",
 )
+
+import platform
+if platform.system().lower() == "darwin":
+    app = BUNDLE(
+        coll,
+        name="CryoViT.app",
+        icon="icons/cryovit.icns",
+        bundle_identifier=None,
+    )

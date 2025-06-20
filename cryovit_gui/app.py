@@ -88,8 +88,23 @@ import json
 
 with open(base_dir / "logging.json", "r") as f:
     logging.config.dictConfig(json.load(f))
+
 logger = logging.getLogger("cryovit")
 debug_logger = logging.getLogger("debug")
+
+try:
+    file_handler = logging.FileHandler(base_dir / "cryovit.log", mode="w")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(
+        logging.Formatter(
+            "[%(asctime)s] %(name)s:%(levelname)s:%(lineno)d: %(message)s"
+        )
+    )
+
+    logger.addHandler(file_handler)
+    debug_logger.addHandler(file_handler)
+except:
+    logger.warning("Failed to set up file logging. Using console only.")
 
 
 class WorkerSignals(QObject):
