@@ -1,6 +1,7 @@
 """Define a base item model supporting ConfigGroups for the CryoViT GUI application."""
 
 from PyQt6.QtCore import QAbstractItemModel, QModelIndex, QVariant, Qt
+from PyQt6.QtGui import QFont
 
 from cryovit_gui.config import ConfigGroup, ConfigField, ConfigKey
 
@@ -132,13 +133,12 @@ class ConfigModel(QAbstractItemModel):
         if not index.isValid():
             return QVariant()
         target_config = index.internalPointer()
-        if (
-            isinstance(target_config, ConfigGroup)
-            and role == Qt.ItemDataRole.DisplayRole
-            and index.column() == 0
-        ):
-            # Return the name of the configuration group
-            return QVariant(target_config.name)
+        if isinstance(target_config, ConfigGroup) and index.column() == 0:
+            if role == Qt.ItemDataRole.DisplayRole:
+                # Return the name of the configuration group
+                return QVariant(target_config.name)
+            elif role == Qt.ItemDataRole.FontRole:
+                return QFont("Segoe UI", 12, QFont.Weight.Bold)
         elif isinstance(target_config, ConfigField):
             match role:
                 case Qt.ItemDataRole.DisplayRole:
@@ -247,3 +247,12 @@ class ConfigModel(QAbstractItemModel):
             value (str): The value to set for the configuration field.
         """
         self._set_config(key, value)
+
+    def generate_commands(self) -> list[str]:
+        """
+        Generate a list of commands based on the current configuration.
+
+        Returns:
+            list[str]: A list of command strings representing the current configuration.
+        """
+        return self._config.generate_commands()

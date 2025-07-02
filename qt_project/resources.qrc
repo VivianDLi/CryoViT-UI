@@ -1,5 +1,5 @@
 <RCC>
-    <qresource prefix="icons">
+    <qresource prefix="/icons">
         <file alias="add.svg">resources/add.svg</file>
         <file alias="file.svg">resources/file.svg</file>
         <file alias="github.svg">resources/github.svg</file>
@@ -11,5 +11,6 @@
         <file alias="save_light.svg">resources/save_light.svg</file>
         <file alias="settings_light.svg">resources/settings_light.svg</file>
         <file alias="wrench.svg">resources/wrench.svg</file>
+        <file alias="cryovit.png">resources/cryovit.png</file>
     </qresource>
 </RCC>

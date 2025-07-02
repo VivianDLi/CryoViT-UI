@@ -10,7 +10,7 @@ from PyQt6.QtCore import (
     QVariant,
     Qt,
 )
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtGui import QBrush, QColor, QFont
 
 from cryovit_gui.config import (
     FileData,
@@ -236,6 +236,8 @@ class FileModel(QAbstractTableModel):
                             return QBrush(QColor(*Colors.GREEN.value))
                     case Qt.ItemDataRole.UserRole:
                         return QVariant(sample)
+                    case Qt.ItemDataRole.FontRole:
+                        return QFont("Segoe UI", 12, QFont.Weight.Bold)
                     case _:
                         return QVariant()
             case 1:  # Tomogram File

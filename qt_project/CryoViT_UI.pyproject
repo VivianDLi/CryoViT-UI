@@ -3,7 +3,6 @@
     "PY_FILE": "mainwindow.py",
     "UI_FILE": "mainwindow.ui",
     "files": [
-        "modeldialog.ui",
         "mainwindow.ui",
         "presetdialog.ui",
         "resources.qrc",

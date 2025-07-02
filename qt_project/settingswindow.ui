@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>800</height>
+    <width>800</width>
+    <height>1000</height>
    </rect>
   </property>
   <property name="font">
@@ -21,6 +21,10 @@
   <property name="layoutDirection">
    <enum>Qt::LayoutDirection::RightToLeft</enum>
   </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(235, 235, 235);
+color: rgb(20, 20, 20);</string>
+  </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QPushButton" name="defaultButton">
@@ -29,6 +33,21 @@
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 150px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 10pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
      </property>
      <property name="text">
       <string>Reset to Default</string>
@@ -40,12 +59,48 @@
      <property name="layoutDirection">
       <enum>Qt::LayoutDirection::LeftToRight</enum>
      </property>
+     <property name="styleSheet">
+      <string notr="true">QTreeView {
+	alternate-background-color: rgb(215, 215, 215);
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTreeView::item {
+	height: 35px;
+	border: 1px solid gray;
+	font: 11pt &quot;Segoe UI&quot;;
+}</string>
+     </property>
+     <property name="alternatingRowColors">
+      <bool>true</bool>
+     </property>
+     <property name="selectionMode">
+      <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+     </property>
+     <property name="selectionBehavior">
+      <enum>QAbstractItemView::SelectionBehavior::SelectItems</enum>
+     </property>
     </widget>
    </item>
    <item>
     <widget class="QDialogButtonBox" name="buttonBox">
      <property name="layoutDirection">
       <enum>Qt::LayoutDirection::LeftToRight</enum>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 150px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
      </property>
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>

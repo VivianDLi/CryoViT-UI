@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>600</width>
-    <height>200</height>
+    <width>750</width>
+    <height>250</height>
    </rect>
   </property>
   <property name="sizePolicy">
@@ -18,6 +18,10 @@
   </property>
   <property name="windowTitle">
    <string>Select an existing preset or create a new one to save:</string>
+  </property>
+  <property name="styleSheet">
+   <string notr="true">background-color: rgb(235, 235, 235);
+color: rgb(20, 20, 20);</string>
   </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
@@ -37,10 +41,29 @@
      <layout class="QGridLayout" name="gridLayout">
       <item row="1" column="0" colspan="2">
        <widget class="QLineEdit" name="presetName">
+        <property name="sizePolicy">
+         <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+          <horstretch>0</horstretch>
+          <verstretch>0</verstretch>
+         </sizepolicy>
+        </property>
         <property name="font">
          <font>
-          <pointsize>10</pointsize>
+          <family>Segoe UI</family>
+          <pointsize>12</pointsize>
+          <italic>false</italic>
+          <bold>false</bold>
          </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QLineEdit {
+    border: 2px solid gray;
+    border-radius: 10px;
+    padding: 0 8px;
+    background: white;
+    selection-background-color: darkgray;
+	font: 12pt &quot;Segoe UI&quot;;
+}</string>
         </property>
        </widget>
       </item>
@@ -48,8 +71,18 @@
        <widget class="QLabel" name="presetLabel">
         <property name="font">
          <font>
-          <pointsize>10</pointsize>
+          <family>Segoe UI</family>
+          <pointsize>12</pointsize>
+          <italic>false</italic>
+          <fontweight>DemiBold</fontweight>
          </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QFrame {
+	border: 0px;
+	width: 200px;
+	font: 600 12pt &quot;Segoe UI&quot;;
+}</string>
         </property>
         <property name="text">
          <string>Available Presets:</string>
@@ -60,8 +93,26 @@
        <widget class="QPushButton" name="presetAdd">
         <property name="font">
          <font>
-          <pointsize>10</pointsize>
+          <family>Segoe UI</family>
+          <pointsize>12</pointsize>
+          <italic>false</italic>
+          <fontweight>DemiBold</fontweight>
          </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 100px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
         </property>
         <property name="text">
          <string>Add</string>
@@ -72,8 +123,26 @@
        <widget class="QPushButton" name="presetRemove">
         <property name="font">
          <font>
-          <pointsize>10</pointsize>
+          <family>Segoe UI</family>
+          <pointsize>12</pointsize>
+          <italic>false</italic>
+          <fontweight>DemiBold</fontweight>
          </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 100px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
         </property>
         <property name="text">
          <string>Remove</string>
@@ -90,8 +159,42 @@
         </property>
         <property name="font">
          <font>
-          <pointsize>10</pointsize>
+          <family>Segoe UI</family>
+          <pointsize>12</pointsize>
+          <italic>false</italic>
+          <fontweight>DemiBold</fontweight>
          </font>
+        </property>
+        <property name="styleSheet">
+         <string notr="true">QComboBox {
+	border: 2px solid gray;
+	border-radius: 15px;
+	height: 35px;
+	padding: 5px 18px 5px 15px;
+	background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                 stop: 0 #E1E1E1, stop: 0.4 #DDDDDD,
+                                 stop: 0.5 #D8D8D8, stop: 1.0 #D3D3D3);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+
+QComboBox:on {
+    padding-top: 3px;
+    padding-left: 4px;
+}
+
+QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 30px;
+
+    border-left-width: 0px;
+    border-top-right-radius: 15px;
+    border-bottom-right-radius: 15px;
+}
+QComboBox::item {
+	background-color: white;
+	selection-background-color: rgb(181, 181, 181);
+}</string>
         </property>
         <property name="currentText">
          <string/>
@@ -100,7 +203,7 @@
          <enum>QComboBox::InsertPolicy::InsertAlphabetically</enum>
         </property>
         <property name="placeholderText">
-         <string>No preset selected</string>
+         <string>no preset selected</string>
         </property>
        </widget>
       </item>
@@ -113,6 +216,21 @@
       <font>
        <pointsize>10</pointsize>
       </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 150px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
      </property>
      <property name="orientation">
       <enum>Qt::Orientation::Horizontal</enum>

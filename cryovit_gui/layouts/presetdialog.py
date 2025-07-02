@@ -12,12 +12,14 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_Dialog(object):
     def setupUi(self, Dialog):
         Dialog.setObjectName("Dialog")
-        Dialog.resize(600, 200)
+        Dialog.resize(750, 250)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Minimum)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(Dialog.sizePolicy().hasHeightForWidth())
         Dialog.setSizePolicy(sizePolicy)
+        Dialog.setStyleSheet("background-color: rgb(235, 235, 235);\n"
+"color: rgb(20, 20, 20);")
         self.verticalLayout = QtWidgets.QVBoxLayout(Dialog)
         self.verticalLayout.setObjectName("verticalLayout")
         self.presetFrame = QtWidgets.QFrame(parent=Dialog)
@@ -32,27 +34,80 @@ class Ui_Dialog(object):
         self.gridLayout = QtWidgets.QGridLayout(self.presetFrame)
         self.gridLayout.setObjectName("gridLayout")
         self.presetName = QtWidgets.QLineEdit(parent=self.presetFrame)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.presetName.sizePolicy().hasHeightForWidth())
+        self.presetName.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
-        font.setPointSize(10)
+        font.setFamily("Segoe UI")
+        font.setPointSize(12)
+        font.setBold(False)
+        font.setItalic(False)
         self.presetName.setFont(font)
+        self.presetName.setStyleSheet("QLineEdit {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 10px;\n"
+"    padding: 0 8px;\n"
+"    background: white;\n"
+"    selection-background-color: darkgray;\n"
+"    font: 12pt \"Segoe UI\";\n"
+"}")
         self.presetName.setObjectName("presetName")
         self.gridLayout.addWidget(self.presetName, 1, 0, 1, 2)
         self.presetLabel = QtWidgets.QLabel(parent=self.presetFrame)
         font = QtGui.QFont()
-        font.setPointSize(10)
+        font.setFamily("Segoe UI")
+        font.setPointSize(12)
+        font.setItalic(False)
         self.presetLabel.setFont(font)
+        self.presetLabel.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"    width: 200px;\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}")
         self.presetLabel.setObjectName("presetLabel")
         self.gridLayout.addWidget(self.presetLabel, 0, 0, 1, 1)
         self.presetAdd = QtWidgets.QPushButton(parent=self.presetFrame)
         font = QtGui.QFont()
-        font.setPointSize(10)
+        font.setFamily("Segoe UI")
+        font.setPointSize(12)
+        font.setItalic(False)
         self.presetAdd.setFont(font)
+        self.presetAdd.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 100px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.presetAdd.setObjectName("presetAdd")
         self.gridLayout.addWidget(self.presetAdd, 1, 2, 1, 1)
         self.presetRemove = QtWidgets.QPushButton(parent=self.presetFrame)
         font = QtGui.QFont()
-        font.setPointSize(10)
+        font.setFamily("Segoe UI")
+        font.setPointSize(12)
+        font.setItalic(False)
         self.presetRemove.setFont(font)
+        self.presetRemove.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 100px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.presetRemove.setObjectName("presetRemove")
         self.gridLayout.addWidget(self.presetRemove, 1, 3, 1, 1)
         self.presetSelect = QtWidgets.QComboBox(parent=self.presetFrame)
@@ -62,8 +117,39 @@ class Ui_Dialog(object):
         sizePolicy.setHeightForWidth(self.presetSelect.sizePolicy().hasHeightForWidth())
         self.presetSelect.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
-        font.setPointSize(10)
+        font.setFamily("Segoe UI")
+        font.setPointSize(12)
+        font.setItalic(False)
         self.presetSelect.setFont(font)
+        self.presetSelect.setStyleSheet("QComboBox {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 15px;\n"
+"    height: 35px;\n"
+"    padding: 5px 18px 5px 15px;\n"
+"    background: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                 stop: 0 #E1E1E1, stop: 0.4 #DDDDDD,\n"
+"                                 stop: 0.5 #D8D8D8, stop: 1.0 #D3D3D3);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"\n"
+"QComboBox:on {\n"
+"    padding-top: 3px;\n"
+"    padding-left: 4px;\n"
+"}\n"
+"\n"
+"QComboBox::drop-down {\n"
+"    subcontrol-origin: padding;\n"
+"    subcontrol-position: top right;\n"
+"    width: 30px;\n"
+"\n"
+"    border-left-width: 0px;\n"
+"    border-top-right-radius: 15px;\n"
+"    border-bottom-right-radius: 15px;\n"
+"}\n"
+"QComboBox::item {\n"
+"    background-color: white;\n"
+"    selection-background-color: rgb(181, 181, 181);\n"
+"}")
         self.presetSelect.setCurrentText("")
         self.presetSelect.setInsertPolicy(QtWidgets.QComboBox.InsertPolicy.InsertAlphabetically)
         self.presetSelect.setObjectName("presetSelect")
@@ -73,6 +159,19 @@ class Ui_Dialog(object):
         font = QtGui.QFont()
         font.setPointSize(10)
         self.buttonBox.setFont(font)
+        self.buttonBox.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 150px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")
@@ -89,4 +188,4 @@ class Ui_Dialog(object):
         self.presetLabel.setText(_translate("Dialog", "Available Presets:"))
         self.presetAdd.setText(_translate("Dialog", "Add"))
         self.presetRemove.setText(_translate("Dialog", "Remove"))
-        self.presetSelect.setPlaceholderText(_translate("Dialog", "No preset selected"))
+        self.presetSelect.setPlaceholderText(_translate("Dialog", "no preset selected"))

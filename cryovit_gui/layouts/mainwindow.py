@@ -13,7 +13,15 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(800, 1200)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(MainWindow.sizePolicy().hasHeightForWidth())
+        MainWindow.setSizePolicy(sizePolicy)
         MainWindow.setMinimumSize(QtCore.QSize(400, 600))
+        icon = QtGui.QIcon()
+        icon.addPixmap(QtGui.QPixmap(":/icons/cryovit.png"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        MainWindow.setWindowIcon(icon)
         MainWindow.setStyleSheet("background-color: rgb(235, 235, 235);\n"
 "color: rgb(20, 20, 20);")
         self.centralwidget = QtWidgets.QWidget(parent=MainWindow)
@@ -21,12 +29,28 @@ class Ui_MainWindow(object):
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetDefaultConstraint)
-        self.verticalLayout.setContentsMargins(9, 5, 9, 0)
+        self.verticalLayout.setContentsMargins(10, 5, 10, 0)
         self.verticalLayout.setObjectName("verticalLayout")
         self.modeTabs = QtWidgets.QTabWidget(parent=self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.modeTabs.sizePolicy().hasHeightForWidth())
+        self.modeTabs.setSizePolicy(sizePolicy)
+        self.modeTabs.setMaximumSize(QtCore.QSize(16777215, 16777215))
         font = QtGui.QFont()
         font.setPointSize(10)
         self.modeTabs.setFont(font)
+        self.modeTabs.setStyleSheet("QTabBar::tab {\n"
+"    height: 50px;\n"
+"    width: 156px;\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}")
+        self.modeTabs.setTabPosition(QtWidgets.QTabWidget.TabPosition.North)
+        self.modeTabs.setTabShape(QtWidgets.QTabWidget.TabShape.Rounded)
+        self.modeTabs.setIconSize(QtCore.QSize(16, 16))
+        self.modeTabs.setElideMode(QtCore.Qt.TextElideMode.ElideNone)
+        self.modeTabs.setMovable(False)
         self.modeTabs.setTabBarAutoHide(False)
         self.modeTabs.setObjectName("modeTabs")
         self.processTab = QtWidgets.QWidget()
@@ -34,40 +58,99 @@ class Ui_MainWindow(object):
         self.verticalLayout_6 = QtWidgets.QVBoxLayout(self.processTab)
         self.verticalLayout_6.setObjectName("verticalLayout_6")
         self.processView = QtWidgets.QTreeView(parent=self.processTab)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.processView.sizePolicy().hasHeightForWidth())
+        self.processView.setSizePolicy(sizePolicy)
+        self.processView.setStyleSheet("QTreeView {\n"
+"    alternate-background-color: rgb(215, 215, 215);\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTreeView::item {\n"
+"    height: 35px;\n"
+"    border: 1px solid gray;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}\n"
+"QTreeView::item:selection{\n"
+"}")
+        self.processView.setAlternatingRowColors(True)
+        self.processView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.processView.setObjectName("processView")
         self.verticalLayout_6.addWidget(self.processView)
         self.processButton = QtWidgets.QPushButton(parent=self.processTab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.processButton.sizePolicy().hasHeightForWidth())
         self.processButton.setSizePolicy(sizePolicy)
         self.processButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.processButton.setFont(font)
+        self.processButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.processButton.setObjectName("processButton")
         self.verticalLayout_6.addWidget(self.processButton)
         self.modeTabs.addTab(self.processTab, "")
         self.annotTab = QtWidgets.QWidget()
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.annotTab.sizePolicy().hasHeightForWidth())
+        self.annotTab.setSizePolicy(sizePolicy)
+        self.annotTab.setStyleSheet("")
         self.annotTab.setObjectName("annotTab")
         self.verticalLayout_5 = QtWidgets.QVBoxLayout(self.annotTab)
         self.verticalLayout_5.setObjectName("verticalLayout_5")
         self.directoryFrame = QtWidgets.QFrame(parent=self.annotTab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.directoryFrame.sizePolicy().hasHeightForWidth())
         self.directoryFrame.setSizePolicy(sizePolicy)
+        self.directoryFrame.setMinimumSize(QtCore.QSize(0, 50))
+        self.directoryFrame.setStyleSheet("QFrame {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"    height: 50px;\n"
+"}")
         self.directoryFrame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
         self.directoryFrame.setFrameShadow(QtWidgets.QFrame.Shadow.Raised)
         self.directoryFrame.setObjectName("directoryFrame")
         self.horizontalLayout_2 = QtWidgets.QHBoxLayout(self.directoryFrame)
+        self.horizontalLayout_2.setContentsMargins(10, 5, 10, 5)
+        self.horizontalLayout_2.setSpacing(10)
         self.horizontalLayout_2.setObjectName("horizontalLayout_2")
         self.projectDirectoryLabel = QtWidgets.QLabel(parent=self.directoryFrame)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.projectDirectoryLabel.sizePolicy().hasHeightForWidth())
+        self.projectDirectoryLabel.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(10)
+        font.setItalic(False)
         self.projectDirectoryLabel.setFont(font)
+        self.projectDirectoryLabel.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"    width: 200px;\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}")
         self.projectDirectoryLabel.setObjectName("projectDirectoryLabel")
         self.horizontalLayout_2.addWidget(self.projectDirectoryLabel)
         self.projectDirectory = QtWidgets.QLineEdit(parent=self.directoryFrame)
@@ -77,8 +160,19 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.projectDirectory.sizePolicy().hasHeightForWidth())
         self.projectDirectory.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(10)
+        font.setBold(False)
+        font.setItalic(False)
         self.projectDirectory.setFont(font)
+        self.projectDirectory.setStyleSheet("QLineEdit {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 10px;\n"
+"    padding: 0 8px;\n"
+"    background: white;\n"
+"    selection-background-color: darkgray;\n"
+"    font: 10pt \"Segoe UI\";\n"
+"}")
         self.projectDirectory.setObjectName("projectDirectory")
         self.horizontalLayout_2.addWidget(self.projectDirectory)
         self.directoryButton = QtWidgets.QToolButton(parent=self.directoryFrame)
@@ -87,10 +181,21 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.directoryButton.sizePolicy().hasHeightForWidth())
         self.directoryButton.setSizePolicy(sizePolicy)
+        self.directoryButton.setMinimumSize(QtCore.QSize(35, 0))
+        self.directoryButton.setStyleSheet("QToolButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 5px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"}\n"
+"QToolButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.directoryButton.setText("")
-        icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(":/icons/open_folder.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.directoryButton.setIcon(icon)
+        icon1 = QtGui.QIcon()
+        icon1.addPixmap(QtGui.QPixmap(":/icons/open_folder.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.directoryButton.setIcon(icon1)
         self.directoryButton.setObjectName("directoryButton")
         self.horizontalLayout_2.addWidget(self.directoryButton)
         self.verticalLayout_5.addWidget(self.directoryFrame)
@@ -101,46 +206,94 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.annotGroup.sizePolicy().hasHeightForWidth())
         self.annotGroup.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.annotGroup.setFont(font)
+        self.annotGroup.setStyleSheet("QGroupBox {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"    margin-top: 4ex;\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}")
         self.annotGroup.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignTop)
         self.annotGroup.setObjectName("annotGroup")
         self.verticalLayout_9 = QtWidgets.QVBoxLayout(self.annotGroup)
-        self.verticalLayout_9.setContentsMargins(-1, 11, -1, 11)
+        self.verticalLayout_9.setSizeConstraint(QtWidgets.QLayout.SizeConstraint.SetDefaultConstraint)
+        self.verticalLayout_9.setContentsMargins(10, 10, 10, 10)
+        self.verticalLayout_9.setSpacing(10)
         self.verticalLayout_9.setObjectName("verticalLayout_9")
-        self.syncIcon = QtWidgets.QLabel(parent=self.annotGroup)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.syncIcon.sizePolicy().hasHeightForWidth())
-        self.syncIcon.setSizePolicy(sizePolicy)
-        self.syncIcon.setMinimumSize(QtCore.QSize(20, 20))
-        self.syncIcon.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
-        self.syncIcon.setText("")
-        self.syncIcon.setTextFormat(QtCore.Qt.TextFormat.PlainText)
-        self.syncIcon.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight|QtCore.Qt.AlignmentFlag.AlignTrailing|QtCore.Qt.AlignmentFlag.AlignVCenter)
-        self.syncIcon.setObjectName("syncIcon")
-        self.verticalLayout_9.addWidget(self.syncIcon)
-        self.selectLabel = QtWidgets.QLabel(parent=self.annotGroup)
+        self.frame_4 = QtWidgets.QFrame(parent=self.annotGroup)
+        self.frame_4.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.frame_4.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.frame_4.setLineWidth(0)
+        self.frame_4.setObjectName("frame_4")
+        self.horizontalLayout_5 = QtWidgets.QHBoxLayout(self.frame_4)
+        self.horizontalLayout_5.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_5.setSpacing(5)
+        self.horizontalLayout_5.setObjectName("horizontalLayout_5")
+        self.selectLabel = QtWidgets.QLabel(parent=self.frame_4)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(10)
+        font.setBold(True)
+        font.setItalic(False)
         self.selectLabel.setFont(font)
+        self.selectLabel.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"    width: 200px;\n"
+"    font: 700 10pt \"Segoe UI\";\n"
+"}")
         self.selectLabel.setObjectName("selectLabel")
-        self.verticalLayout_9.addWidget(self.selectLabel)
+        self.horizontalLayout_5.addWidget(self.selectLabel)
+        self.verticalLayout_9.addWidget(self.frame_4)
         self.sampleView = QtWidgets.QTableView(parent=self.annotGroup)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.sampleView.sizePolicy().hasHeightForWidth())
         self.sampleView.setSizePolicy(sizePolicy)
+        self.sampleView.setMinimumSize(QtCore.QSize(0, 100))
+        self.sampleView.setMaximumSize(QtCore.QSize(16777215, 700))
+        self.sampleView.setStyleSheet("QTableView {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"    selection-background-color: rgb(140, 140, 255);\n"
+"}\n"
+"QTableView::item {\n"
+"    height: 35px;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}\n"
+"QTableView::item:selected {\n"
+"    border: 2px solid blue;\n"
+"}\n"
+"QHeaderView::section {\n"
+"    height: 50px;\n"
+"    font: 700 12pt \"Segoe UI\";\n"
+"}")
+        self.sampleView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.SingleSelection)
+        self.sampleView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self.sampleView.setSortingEnabled(True)
+        self.sampleView.setCornerButtonEnabled(False)
         self.sampleView.setObjectName("sampleView")
         self.verticalLayout_9.addWidget(self.sampleView)
         self.frame = QtWidgets.QFrame(parent=self.annotGroup)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.frame.sizePolicy().hasHeightForWidth())
+        self.frame.setSizePolicy(sizePolicy)
         self.frame.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.frame.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"}")
         self.frame.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.frame.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.frame.setLineWidth(0)
         self.frame.setObjectName("frame")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.frame)
+        self.horizontalLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_3.setSpacing(5)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Minimum)
         self.horizontalLayout_3.addItem(spacerItem)
@@ -151,6 +304,19 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.selectAllButton.sizePolicy().hasHeightForWidth())
         self.selectAllButton.setSizePolicy(sizePolicy)
         self.selectAllButton.setMaximumSize(QtCore.QSize(16777215, 50))
+        self.selectAllButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 100px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.selectAllButton.setObjectName("selectAllButton")
         self.horizontalLayout_3.addWidget(self.selectAllButton)
         self.deselectAllButton = QtWidgets.QPushButton(parent=self.frame)
@@ -160,6 +326,19 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.deselectAllButton.sizePolicy().hasHeightForWidth())
         self.deselectAllButton.setSizePolicy(sizePolicy)
         self.deselectAllButton.setMaximumSize(QtCore.QSize(16777215, 50))
+        self.deselectAllButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 100px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.deselectAllButton.setObjectName("deselectAllButton")
         self.horizontalLayout_3.addWidget(self.deselectAllButton)
         self.resetDefaultButton = QtWidgets.QPushButton(parent=self.frame)
@@ -170,6 +349,19 @@ class Ui_MainWindow(object):
         self.resetDefaultButton.setSizePolicy(sizePolicy)
         self.resetDefaultButton.setMaximumSize(QtCore.QSize(16777215, 50))
         self.resetDefaultButton.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.resetDefaultButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 150px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.resetDefaultButton.setObjectName("resetDefaultButton")
         self.horizontalLayout_3.addWidget(self.resetDefaultButton)
         self.verticalLayout_9.addWidget(self.frame)
@@ -179,37 +371,92 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.fileView.sizePolicy().hasHeightForWidth())
         self.fileView.setSizePolicy(sizePolicy)
-        self.fileView.setMinimumSize(QtCore.QSize(0, 0))
+        self.fileView.setMinimumSize(QtCore.QSize(0, 100))
+        self.fileView.setMaximumSize(QtCore.QSize(16777215, 700))
+        self.fileView.setStyleSheet("QTableView {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTableView::item {\n"
+"    height: 35px;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}\n"
+"QHeaderView::section {\n"
+"    height: 50px;\n"
+"    font: 700 12pt \"Segoe UI\";\n"
+"}")
+        self.fileView.setAlternatingRowColors(False)
+        self.fileView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        self.fileView.setCornerButtonEnabled(False)
         self.fileView.setObjectName("fileView")
         self.verticalLayout_9.addWidget(self.fileView)
         self.frame_2 = QtWidgets.QFrame(parent=self.annotGroup)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.frame_2.sizePolicy().hasHeightForWidth())
+        self.frame_2.setSizePolicy(sizePolicy)
+        self.frame_2.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"}")
         self.frame_2.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.frame_2.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.frame_2.setLineWidth(0)
         self.frame_2.setObjectName("frame_2")
         self.horizontalLayout = QtWidgets.QHBoxLayout(self.frame_2)
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout.setSpacing(5)
         self.horizontalLayout.setObjectName("horizontalLayout")
         self.chimeraButton = QtWidgets.QPushButton(parent=self.frame_2)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.chimeraButton.sizePolicy().hasHeightForWidth())
         self.chimeraButton.setSizePolicy(sizePolicy)
         self.chimeraButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.chimeraButton.setFont(font)
+        self.chimeraButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.chimeraButton.setObjectName("chimeraButton")
         self.horizontalLayout.addWidget(self.chimeraButton)
         self.slicesButton = QtWidgets.QPushButton(parent=self.frame_2)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.slicesButton.sizePolicy().hasHeightForWidth())
         self.slicesButton.setSizePolicy(sizePolicy)
         self.slicesButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.slicesButton.setFont(font)
+        self.slicesButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.slicesButton.setObjectName("slicesButton")
         self.horizontalLayout.addWidget(self.slicesButton)
         self.verticalLayout_9.addWidget(self.frame_2)
@@ -219,10 +466,23 @@ class Ui_MainWindow(object):
         self.line.setObjectName("line")
         self.verticalLayout_9.addWidget(self.line)
         self.frame_3 = QtWidgets.QFrame(parent=self.annotGroup)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.frame_3.sizePolicy().hasHeightForWidth())
+        self.frame_3.setSizePolicy(sizePolicy)
+        self.frame_3.setMinimumSize(QtCore.QSize(0, 35))
+        self.frame_3.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"    height: 35px;\n"
+"}")
         self.frame_3.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self.frame_3.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self.frame_3.setLineWidth(0)
         self.frame_3.setObjectName("frame_3")
         self.horizontalLayout_4 = QtWidgets.QHBoxLayout(self.frame_3)
+        self.horizontalLayout_4.setContentsMargins(0, 0, 0, 0)
+        self.horizontalLayout_4.setSpacing(10)
         self.horizontalLayout_4.setObjectName("horizontalLayout_4")
         self.featuresLabel = QtWidgets.QLabel(parent=self.frame_3)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
@@ -231,8 +491,16 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.featuresLabel.sizePolicy().hasHeightForWidth())
         self.featuresLabel.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(10)
+        font.setItalic(False)
         self.featuresLabel.setFont(font)
+        self.featuresLabel.setStyleSheet("QFrame {\n"
+"    border: 0px;\n"
+"    width: 200px;\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}")
+        self.featuresLabel.setLineWidth(0)
         self.featuresLabel.setObjectName("featuresLabel")
         self.horizontalLayout_4.addWidget(self.featuresLabel)
         self.featuresDisplay = QtWidgets.QLineEdit(parent=self.frame_3)
@@ -242,8 +510,19 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.featuresDisplay.sizePolicy().hasHeightForWidth())
         self.featuresDisplay.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(10)
+        font.setBold(False)
+        font.setItalic(False)
         self.featuresDisplay.setFont(font)
+        self.featuresDisplay.setStyleSheet("QLineEdit {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 10px;\n"
+"    padding: 0 8px;\n"
+"    background: white;\n"
+"    selection-background-color: darkgray;\n"
+"    font: 10pt \"Segoe UI\";\n"
+"}")
         self.featuresDisplay.setObjectName("featuresDisplay")
         self.horizontalLayout_4.addWidget(self.featuresDisplay)
         self.featuresButton = QtWidgets.QToolButton(parent=self.frame_3)
@@ -252,25 +531,58 @@ class Ui_MainWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.featuresButton.sizePolicy().hasHeightForWidth())
         self.featuresButton.setSizePolicy(sizePolicy)
+        self.featuresButton.setMinimumSize(QtCore.QSize(35, 0))
+        self.featuresButton.setStyleSheet("QToolButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 5px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"}\n"
+"QToolButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.featuresButton.setText("")
-        icon1 = QtGui.QIcon()
-        icon1.addPixmap(QtGui.QPixmap(":/icons/file.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.featuresButton.setIcon(icon1)
+        icon2 = QtGui.QIcon()
+        icon2.addPixmap(QtGui.QPixmap(":/icons/file.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.featuresButton.setIcon(icon2)
         self.featuresButton.setObjectName("featuresButton")
         self.horizontalLayout_4.addWidget(self.featuresButton)
         self.verticalLayout_9.addWidget(self.frame_3)
         self.annotButton = QtWidgets.QPushButton(parent=self.annotGroup)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.annotButton.sizePolicy().hasHeightForWidth())
         self.annotButton.setSizePolicy(sizePolicy)
         self.annotButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.annotButton.setFont(font)
+        self.annotButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.annotButton.setObjectName("annotButton")
         self.verticalLayout_9.addWidget(self.annotButton)
+        self.verticalLayout_9.setStretch(0, 1)
+        self.verticalLayout_9.setStretch(1, 5)
+        self.verticalLayout_9.setStretch(2, 2)
+        self.verticalLayout_9.setStretch(3, 5)
+        self.verticalLayout_9.setStretch(4, 2)
+        self.verticalLayout_9.setStretch(5, 1)
+        self.verticalLayout_9.setStretch(6, 1)
+        self.verticalLayout_9.setStretch(7, 2)
         self.verticalLayout_5.addWidget(self.annotGroup)
         self.splitsGroup = QtWidgets.QGroupBox(parent=self.annotTab)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Preferred)
@@ -279,21 +591,45 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.splitsGroup.sizePolicy().hasHeightForWidth())
         self.splitsGroup.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.splitsGroup.setFont(font)
+        self.splitsGroup.setStyleSheet("QGroupBox {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"    margin-top: 4ex;\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}")
         self.splitsGroup.setObjectName("splitsGroup")
         self.verticalLayout_8 = QtWidgets.QVBoxLayout(self.splitsGroup)
+        self.verticalLayout_8.setContentsMargins(10, 10, 10, 10)
+        self.verticalLayout_8.setSpacing(10)
         self.verticalLayout_8.setObjectName("verticalLayout_8")
         self.splitsButton = QtWidgets.QPushButton(parent=self.splitsGroup)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.splitsButton.sizePolicy().hasHeightForWidth())
         self.splitsButton.setSizePolicy(sizePolicy)
         self.splitsButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.splitsButton.setFont(font)
+        self.splitsButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.splitsButton.setObjectName("splitsButton")
         self.verticalLayout_8.addWidget(self.splitsButton)
         self.verticalLayout_5.addWidget(self.splitsGroup)
@@ -303,18 +639,49 @@ class Ui_MainWindow(object):
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.trainTab)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
         self.trainView = QtWidgets.QTreeView(parent=self.trainTab)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.trainView.sizePolicy().hasHeightForWidth())
+        self.trainView.setSizePolicy(sizePolicy)
+        self.trainView.setStyleSheet("QTreeView {\n"
+"    alternate-background-color: rgb(215, 215, 215);\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTreeView::item {\n"
+"    height: 35px;\n"
+"    border: 1px solid gray;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}")
+        self.trainView.setAlternatingRowColors(True)
+        self.trainView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.trainView.setObjectName("trainView")
         self.verticalLayout_2.addWidget(self.trainView)
         self.trainButton = QtWidgets.QPushButton(parent=self.trainTab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.trainButton.sizePolicy().hasHeightForWidth())
         self.trainButton.setSizePolicy(sizePolicy)
         self.trainButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.trainButton.setFont(font)
+        self.trainButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.trainButton.setObjectName("trainButton")
         self.verticalLayout_2.addWidget(self.trainButton)
         self.modeTabs.addTab(self.trainTab, "")
@@ -323,18 +690,49 @@ class Ui_MainWindow(object):
         self.verticalLayout_4 = QtWidgets.QVBoxLayout(self.evalTab)
         self.verticalLayout_4.setObjectName("verticalLayout_4")
         self.evalView = QtWidgets.QTreeView(parent=self.evalTab)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.evalView.sizePolicy().hasHeightForWidth())
+        self.evalView.setSizePolicy(sizePolicy)
+        self.evalView.setStyleSheet("QTreeView {\n"
+"    alternate-background-color: rgb(215, 215, 215);\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTreeView::item {\n"
+"    height: 35px;\n"
+"    border: 1px solid gray;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}")
+        self.evalView.setAlternatingRowColors(True)
+        self.evalView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.evalView.setObjectName("evalView")
         self.verticalLayout_4.addWidget(self.evalView)
         self.evalButton = QtWidgets.QPushButton(parent=self.evalTab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.evalButton.sizePolicy().hasHeightForWidth())
         self.evalButton.setSizePolicy(sizePolicy)
         self.evalButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.evalButton.setFont(font)
+        self.evalButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.evalButton.setObjectName("evalButton")
         self.verticalLayout_4.addWidget(self.evalButton)
         self.modeTabs.addTab(self.evalTab, "")
@@ -343,39 +741,77 @@ class Ui_MainWindow(object):
         self.verticalLayout_7 = QtWidgets.QVBoxLayout(self.segmentTab)
         self.verticalLayout_7.setObjectName("verticalLayout_7")
         self.segmentView = QtWidgets.QTreeView(parent=self.segmentTab)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Preferred)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.segmentView.sizePolicy().hasHeightForWidth())
+        self.segmentView.setSizePolicy(sizePolicy)
+        self.segmentView.setStyleSheet("QTreeView {\n"
+"    alternate-background-color: rgb(215, 215, 215);\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTreeView::item {\n"
+"    height: 35px;\n"
+"    border: 1px solid gray;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}")
+        self.segmentView.setAlternatingRowColors(True)
+        self.segmentView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
         self.segmentView.setObjectName("segmentView")
         self.verticalLayout_7.addWidget(self.segmentView)
         self.segmentButton = QtWidgets.QPushButton(parent=self.segmentTab)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.segmentButton.sizePolicy().hasHeightForWidth())
         self.segmentButton.setSizePolicy(sizePolicy)
         self.segmentButton.setMaximumSize(QtCore.QSize(16777215, 50))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.segmentButton.setFont(font)
+        self.segmentButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    height: 50px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.segmentButton.setObjectName("segmentButton")
         self.verticalLayout_7.addWidget(self.segmentButton)
         self.modeTabs.addTab(self.segmentTab, "")
         self.verticalLayout.addWidget(self.modeTabs)
-        spacerItem1 = QtWidgets.QSpacerItem(20, 10, QtWidgets.QSizePolicy.Policy.Minimum, QtWidgets.QSizePolicy.Policy.Preferred)
-        self.verticalLayout.addItem(spacerItem1)
         self.consoleBox = QtWidgets.QGroupBox(parent=self.centralwidget)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Expanding)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.consoleBox.sizePolicy().hasHeightForWidth())
         self.consoleBox.setSizePolicy(sizePolicy)
-        self.consoleBox.setMaximumSize(QtCore.QSize(16777215, 200))
+        self.consoleBox.setMaximumSize(QtCore.QSize(16777215, 300))
         font = QtGui.QFont()
+        font.setFamily("Segoe UI")
         font.setPointSize(12)
+        font.setItalic(False)
         self.consoleBox.setFont(font)
         self.consoleBox.setFocusPolicy(QtCore.Qt.FocusPolicy.ClickFocus)
+        self.consoleBox.setStyleSheet("QGroupBox {\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"    margin-top: 4ex;\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}")
+        self.consoleBox.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeading|QtCore.Qt.AlignmentFlag.AlignLeft|QtCore.Qt.AlignmentFlag.AlignTop)
         self.consoleBox.setObjectName("consoleBox")
         self.verticalLayout_3 = QtWidgets.QVBoxLayout(self.consoleBox)
-        self.verticalLayout_3.setContentsMargins(5, 5, 5, 5)
-        self.verticalLayout_3.setSpacing(1)
+        self.verticalLayout_3.setContentsMargins(0, 0, 0, 0)
+        self.verticalLayout_3.setSpacing(0)
         self.verticalLayout_3.setObjectName("verticalLayout_3")
         self.consoleText = QtWidgets.QTextBrowser(parent=self.consoleBox)
         sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Expanding, QtWidgets.QSizePolicy.Policy.Expanding)
@@ -384,16 +820,20 @@ class Ui_MainWindow(object):
         sizePolicy.setHeightForWidth(self.consoleText.sizePolicy().hasHeightForWidth())
         self.consoleText.setSizePolicy(sizePolicy)
         font = QtGui.QFont()
-        font.setFamily("Segoe UI")
-        font.setPointSize(10)
+        font.setFamily("Cascadia Code")
+        font.setPointSize(11)
         font.setBold(False)
         font.setItalic(False)
         self.consoleText.setFont(font)
         self.consoleText.setAcceptDrops(False)
-        self.consoleText.setStyleSheet("background-color: rgb(90, 90, 90);\n"
-"color: rgb(255, 255, 255);\n"
-"border-color: rgb(90, 90, 90);\n"
-"font: 10pt \"Segoe UI\";")
+        self.consoleText.setStyleSheet("QTextEdit {\n"
+"    color: #CCCCCC;\n"
+"    selection-color: rgb(255, 255, 255);\n"
+"    background-color: #0C0C0C;\n"
+"    border-color: #FFFFFF;\n"
+"    border-radius: 5px;\n"
+"    font: 11pt \"Cascadia Code\";\n"
+"}")
         self.consoleText.setFrameShape(QtWidgets.QFrame.Shape.WinPanel)
         self.consoleText.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
         self.consoleText.setDocumentTitle("")
@@ -407,8 +847,24 @@ class Ui_MainWindow(object):
         self.statusbar.setObjectName("statusbar")
         MainWindow.setStatusBar(self.statusbar)
         self.menubar = QtWidgets.QMenuBar(parent=MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 25))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 24))
         self.menubar.setAutoFillBackground(False)
+        self.menubar.setStyleSheet("QMenuBar {\n"
+"    width: 50px;\n"
+"    font: 10pt \"Segoe UI\";\n"
+"}\n"
+"QMenuBar::item {\n"
+"    spacing: 5px;\n"
+"    padding: 1px 4px;\n"
+"    background: transparent;\n"
+"    border-radius: 4px;\n"
+"}\n"
+"QMenuBar::item:selected {\n"
+"    background: #a8a8a8;\n"
+"}\n"
+"QMenuBar::item:pressed {\n"
+"    background: #AAAAAA;\n"
+"}")
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(parent=self.menubar)
         palette = QtGui.QPalette()
@@ -476,22 +932,64 @@ class Ui_MainWindow(object):
         brush.setStyle(QtCore.Qt.BrushStyle.SolidPattern)
         palette.setBrush(QtGui.QPalette.ColorGroup.Disabled, QtGui.QPalette.ColorRole.PlaceholderText, brush)
         self.menuFile.setPalette(palette)
+        self.menuFile.setStyleSheet("QMenu {\n"
+"    margin: 2px;\n"
+"}\n"
+"QMenu::item {\n"
+"    padding: 2px 25px 2px 20px;\n"
+"    width: 100px;\n"
+"    height: 25px;\n"
+"    border: 1px solid transparent;\n"
+"    font: 9pt \"Segoe UI\";\n"
+"}\n"
+"QMenu::item:selected {\n"
+"    border-color: darkblue;\n"
+"    background: rgba(100, 100, 100, 150);\n"
+"}")
         self.menuFile.setObjectName("menuFile")
         self.menuHelp = QtWidgets.QMenu(parent=self.menubar)
+        self.menuHelp.setStyleSheet("QMenu {\n"
+"    margin: 2px;\n"
+"}\n"
+"QMenu::item {\n"
+"    padding: 2px 25px 2px 20px;\n"
+"    width: 100px;\n"
+"    height: 25px;\n"
+"    border: 1px solid transparent;\n"
+"    font: 9pt \"Segoe UI\";\n"
+"}\n"
+"QMenu::item:selected {\n"
+"    border-color: darkblue;\n"
+"    background: rgba(100, 100, 100, 150);\n"
+"}")
         self.menuHelp.setObjectName("menuHelp")
         self.menuTools = QtWidgets.QMenu(parent=self.menubar)
+        self.menuTools.setStyleSheet("QMenu {\n"
+"    margin: 2px;\n"
+"}\n"
+"QMenu::item {\n"
+"    padding: 2px 25px 2px 20px;\n"
+"    width: 200px;\n"
+"    height: 25px;\n"
+"    border: 1px solid transparent;\n"
+"    font: 9pt \"Segoe UI\";\n"
+"}\n"
+"QMenu::item:selected {\n"
+"    border-color: darkblue;\n"
+"    background: rgba(100, 100, 100, 150);\n"
+"}")
         self.menuTools.setObjectName("menuTools")
         MainWindow.setMenuBar(self.menubar)
         self.actionSettings = QtGui.QAction(parent=MainWindow)
         self.actionSettings.setCheckable(False)
-        icon2 = QtGui.QIcon()
-        icon2.addPixmap(QtGui.QPixmap(":/icons/settings.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.actionSettings.setIcon(icon2)
+        icon3 = QtGui.QIcon()
+        icon3.addPixmap(QtGui.QPixmap(":/icons/settings.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.actionSettings.setIcon(icon3)
         self.actionSettings.setObjectName("actionSettings")
         self.actionGithub = QtGui.QAction(parent=MainWindow)
-        icon3 = QtGui.QIcon()
-        icon3.addPixmap(QtGui.QPixmap(":/icons/github.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.actionGithub.setIcon(icon3)
+        icon4 = QtGui.QIcon()
+        icon4.addPixmap(QtGui.QPixmap(":/icons/github.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.actionGithub.setIcon(icon4)
         self.actionGithub.setObjectName("actionGithub")
         self.actionSave_Preset = QtGui.QAction(parent=MainWindow)
         self.actionSave_Preset.setObjectName("actionSave_Preset")
@@ -500,12 +998,12 @@ class Ui_MainWindow(object):
         self.action = QtGui.QAction(parent=MainWindow)
         self.action.setObjectName("action")
         self.actionSaveAs_Preset = QtGui.QAction(parent=MainWindow)
-        icon4 = QtGui.QIcon()
-        icon4.addPixmap(QtGui.QPixmap(":/icons/save.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
-        self.actionSaveAs_Preset.setIcon(icon4)
+        icon5 = QtGui.QIcon()
+        icon5.addPixmap(QtGui.QPixmap(":/icons/save.svg"), QtGui.QIcon.Mode.Normal, QtGui.QIcon.State.Off)
+        self.actionSaveAs_Preset.setIcon(icon5)
         self.actionSaveAs_Preset.setObjectName("actionSaveAs_Preset")
         self.actionLoad_Preset = QtGui.QAction(parent=MainWindow)
-        self.actionLoad_Preset.setIcon(icon1)
+        self.actionLoad_Preset.setIcon(icon2)
         self.actionLoad_Preset.setObjectName("actionLoad_Preset")
         self.actionDirectory_Setup = QtGui.QAction(parent=MainWindow)
         self.actionDirectory_Setup.setObjectName("actionDirectory_Setup")
@@ -570,6 +1068,14 @@ class Ui_MainWindow(object):
         self.segmentButton.setText(_translate("MainWindow", "Generate Command"))
         self.modeTabs.setTabText(self.modeTabs.indexOf(self.segmentTab), _translate("MainWindow", "5. Segmentation"))
         self.consoleBox.setTitle(_translate("MainWindow", "Console"))
+        self.consoleText.setHtml(_translate("MainWindow", "<!DOCTYPE HTML PUBLIC \"-//W3C//DTD HTML 4.0//EN\" \"http://www.w3.org/TR/REC-html40/strict.dtd\">\n"
+"<html><head><meta name=\"qrichtext\" content=\"1\" /><meta charset=\"utf-8\" /><style type=\"text/css\">\n"
+"p, li { white-space: pre-wrap; }\n"
+"hr { height: 1px; border-width: 0; }\n"
+"li.unchecked::marker { content: \"\\2610\"; }\n"
+"li.checked::marker { content: \"\\2612\"; }\n"
+"</style></head><body style=\" font-family:\'Cascadia Code\'; font-size:11pt; font-weight:400; font-style:normal;\">\n"
+"<p style=\"-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:\'Segoe UI\'; font-size:9pt;\"><br /></p></body></html>"))
         self.consoleText.setPlaceholderText(_translate("MainWindow", "> Python console outputs here"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuHelp.setTitle(_translate("MainWindow", "Help"))

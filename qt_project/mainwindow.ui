@@ -10,6 +10,12 @@
     <height>1200</height>
    </rect>
   </property>
+  <property name="sizePolicy">
+   <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+    <horstretch>0</horstretch>
+    <verstretch>0</verstretch>
+   </sizepolicy>
+  </property>
   <property name="minimumSize">
    <size>
     <width>400</width>
@@ -18,6 +24,10 @@
   </property>
   <property name="windowTitle">
    <string>CryoViT Segmentation</string>
+  </property>
+  <property name="windowIcon">
+   <iconset resource="resources.qrc">
+    <normaloff>:/icons/cryovit.png</normaloff>:/icons/cryovit.png</iconset>
   </property>
   <property name="styleSheet">
    <string notr="true">background-color: rgb(235, 235, 235);
@@ -32,26 +42,63 @@ color: rgb(20, 20, 20);</string>
      <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
     </property>
     <property name="leftMargin">
-     <number>9</number>
+     <number>10</number>
     </property>
     <property name="topMargin">
      <number>5</number>
     </property>
     <property name="rightMargin">
-     <number>9</number>
+     <number>10</number>
     </property>
     <property name="bottomMargin">
      <number>0</number>
     </property>
     <item>
      <widget class="QTabWidget" name="modeTabs">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+        <horstretch>1</horstretch>
+        <verstretch>0</verstretch>
+       </sizepolicy>
+      </property>
+      <property name="maximumSize">
+       <size>
+        <width>16777215</width>
+        <height>16777215</height>
+       </size>
+      </property>
       <property name="font">
        <font>
         <pointsize>10</pointsize>
        </font>
       </property>
+      <property name="styleSheet">
+       <string notr="true">QTabBar::tab {
+	height: 50px;
+	width: 156px;
+	font: 600 10pt &quot;Segoe UI&quot;;
+}</string>
+      </property>
+      <property name="tabPosition">
+       <enum>QTabWidget::TabPosition::North</enum>
+      </property>
+      <property name="tabShape">
+       <enum>QTabWidget::TabShape::Rounded</enum>
+      </property>
       <property name="currentIndex">
        <number>0</number>
+      </property>
+      <property name="iconSize">
+       <size>
+        <width>16</width>
+        <height>16</height>
+       </size>
+      </property>
+      <property name="elideMode">
+       <enum>Qt::TextElideMode::ElideNone</enum>
+      </property>
+      <property name="movable">
+       <bool>false</bool>
       </property>
       <property name="tabBarAutoHide">
        <bool>false</bool>
@@ -62,12 +109,39 @@ color: rgb(20, 20, 20);</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_6">
         <item>
-         <widget class="QTreeView" name="processView"/>
+         <widget class="QTreeView" name="processView">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QTreeView {
+	alternate-background-color: rgb(215, 215, 215);
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTreeView::item {
+	height: 35px;
+	border: 1px solid gray;
+	font: 11pt &quot;Segoe UI&quot;;
+}
+QTreeView::item:selection{
+}</string>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="processButton">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -80,11 +154,28 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
           </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run pre-processing based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
           </property>
           <property name="text">
            <string>Generate Command</string>
@@ -94,6 +185,15 @@ color: rgb(20, 20, 20);</string>
        </layout>
       </widget>
       <widget class="QWidget" name="annotTab">
+       <property name="sizePolicy">
+        <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+         <horstretch>0</horstretch>
+         <verstretch>0</verstretch>
+        </sizepolicy>
+       </property>
+       <property name="styleSheet">
+        <string notr="true"/>
+       </property>
        <attribute name="title">
         <string>2. Annotation</string>
        </attribute>
@@ -101,10 +201,23 @@ color: rgb(20, 20, 20);</string>
         <item>
          <widget class="QFrame" name="directoryFrame">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+           <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
+          </property>
+          <property name="minimumSize">
+           <size>
+            <width>0</width>
+            <height>50</height>
+           </size>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QFrame {
+	border: 2px solid gray;
+	border-radius: 5px;
+	height: 50px;
+}</string>
           </property>
           <property name="frameShape">
            <enum>QFrame::Shape::StyledPanel</enum>
@@ -113,15 +226,46 @@ color: rgb(20, 20, 20);</string>
            <enum>QFrame::Shadow::Raised</enum>
           </property>
           <layout class="QHBoxLayout" name="horizontalLayout_2">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <property name="leftMargin">
+            <number>10</number>
+           </property>
+           <property name="topMargin">
+            <number>5</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
+           </property>
+           <property name="bottomMargin">
+            <number>5</number>
+           </property>
            <item>
             <widget class="QLabel" name="projectDirectoryLabel">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="font">
               <font>
+               <family>Segoe UI</family>
                <pointsize>10</pointsize>
+               <italic>false</italic>
+               <fontweight>DemiBold</fontweight>
               </font>
              </property>
              <property name="toolTip">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;The location of the project root directory. This has the following file structure layout:&lt;/p&gt;&lt;p&gt;&amp;gt; Project Root&lt;/p&gt;&lt;p&gt;	&amp;gt; Tomograms&lt;/p&gt;&lt;p&gt;		&amp;gt; Sample 1&lt;/p&gt;&lt;p&gt;			&amp;gt; *.hdf&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; csvs&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; slices&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;p&gt;	&amp;gt; Annotations (optional)&lt;/p&gt;&lt;p&gt;		&amp;gt; ...&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QFrame {
+	border: 0px;
+	width: 200px;
+	font: 600 10pt &quot;Segoe UI&quot;;
+}</string>
              </property>
              <property name="text">
               <string>Project Root Directory:</string>
@@ -138,8 +282,21 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
+               <family>Segoe UI</family>
                <pointsize>10</pointsize>
+               <italic>false</italic>
+               <bold>false</bold>
               </font>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QLineEdit {
+    border: 2px solid gray;
+    border-radius: 10px;
+    padding: 0 8px;
+    background: white;
+    selection-background-color: darkgray;
+	font: 10pt &quot;Segoe UI&quot;;
+}</string>
              </property>
              <property name="placeholderText">
               <string>/path/to/the/project/root/directory</string>
@@ -153,6 +310,24 @@ color: rgb(20, 20, 20);</string>
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>35</width>
+               <height>0</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QToolButton {
+	border: 2px solid #8f8f91;
+	border-radius: 5px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+}
+QToolButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
              </property>
              <property name="text">
               <string/>
@@ -176,8 +351,19 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QGroupBox {
+	border: 2px solid gray;
+	border-radius: 5px;
+	margin-top: 4ex;
+	font: 600 12pt &quot;Segoe UI&quot;;
+}</string>
           </property>
           <property name="title">
            <string>Annotations</string>
@@ -185,54 +371,78 @@ color: rgb(20, 20, 20);</string>
           <property name="alignment">
            <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
           </property>
-          <layout class="QVBoxLayout" name="verticalLayout_9">
+          <layout class="QVBoxLayout" name="verticalLayout_9" stretch="1,5,2,5,2,1,1,2">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <property name="sizeConstraint">
+            <enum>QLayout::SizeConstraint::SetDefaultConstraint</enum>
+           </property>
+           <property name="leftMargin">
+            <number>10</number>
+           </property>
            <property name="topMargin">
-            <number>11</number>
+            <number>10</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
            </property>
            <property name="bottomMargin">
-            <number>11</number>
+            <number>10</number>
            </property>
            <item>
-            <widget class="QLabel" name="syncIcon">
-             <property name="sizePolicy">
-              <sizepolicy hsizetype="Fixed" vsizetype="Fixed">
-               <horstretch>0</horstretch>
-               <verstretch>0</verstretch>
-              </sizepolicy>
+            <widget class="QFrame" name="frame_4">
+             <property name="frameShape">
+              <enum>QFrame::Shape::NoFrame</enum>
              </property>
-             <property name="minimumSize">
-              <size>
-               <width>20</width>
-               <height>20</height>
-              </size>
+             <property name="frameShadow">
+              <enum>QFrame::Shadow::Plain</enum>
              </property>
-             <property name="layoutDirection">
-              <enum>Qt::LayoutDirection::LeftToRight</enum>
+             <property name="lineWidth">
+              <number>0</number>
              </property>
-             <property name="text">
-              <string/>
-             </property>
-             <property name="textFormat">
-              <enum>Qt::TextFormat::PlainText</enum>
-             </property>
-             <property name="alignment">
-              <set>Qt::AlignmentFlag::AlignRight|Qt::AlignmentFlag::AlignTrailing|Qt::AlignmentFlag::AlignVCenter</set>
-             </property>
-            </widget>
-           </item>
-           <item>
-            <widget class="QLabel" name="selectLabel">
-             <property name="font">
-              <font>
-               <pointsize>10</pointsize>
-              </font>
-             </property>
-             <property name="toolTip">
-              <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
-             </property>
-             <property name="text">
-              <string>File Selection Progress:</string>
-             </property>
+             <layout class="QHBoxLayout" name="horizontalLayout_5">
+              <property name="spacing">
+               <number>5</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
+              <item>
+               <widget class="QLabel" name="selectLabel">
+                <property name="font">
+                 <font>
+                  <family>Segoe UI</family>
+                  <pointsize>10</pointsize>
+                  <italic>false</italic>
+                  <bold>true</bold>
+                 </font>
+                </property>
+                <property name="toolTip">
+                 <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Records current annotation progress for specific samples and files, and allows users to select files to annotate further.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QFrame {
+	border: 0px;
+	width: 200px;
+	font: 700 10pt &quot;Segoe UI&quot;;
+}</string>
+                </property>
+                <property name="text">
+                 <string>File Selection Progress:</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
             </widget>
            </item>
            <item>
@@ -243,12 +453,65 @@ color: rgb(20, 20, 20);</string>
                <verstretch>0</verstretch>
               </sizepolicy>
              </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>100</height>
+              </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>700</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QTableView {
+	border: 2px solid gray;
+	border-radius: 5px;
+	selection-background-color: rgb(140, 140, 255);
+}
+QTableView::item {
+	height: 35px;
+	font: 11pt &quot;Segoe UI&quot;;
+}
+QTableView::item:selected {
+	border: 2px solid blue;
+}
+QHeaderView::section {
+	height: 50px;
+	font: 700 12pt &quot;Segoe UI&quot;;
+}</string>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SelectionMode::SingleSelection</enum>
+             </property>
+             <property name="selectionBehavior">
+              <enum>QAbstractItemView::SelectionBehavior::SelectRows</enum>
+             </property>
+             <property name="sortingEnabled">
+              <bool>true</bool>
+             </property>
+             <property name="cornerButtonEnabled">
+              <bool>false</bool>
+             </property>
             </widget>
            </item>
            <item>
             <widget class="QFrame" name="frame">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
              <property name="layoutDirection">
               <enum>Qt::LayoutDirection::LeftToRight</enum>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QFrame {
+	border: 0px;
+}</string>
              </property>
              <property name="frameShape">
               <enum>QFrame::Shape::NoFrame</enum>
@@ -256,7 +519,25 @@ color: rgb(20, 20, 20);</string>
              <property name="frameShadow">
               <enum>QFrame::Shadow::Plain</enum>
              </property>
+             <property name="lineWidth">
+              <number>0</number>
+             </property>
              <layout class="QHBoxLayout" name="horizontalLayout_3">
+              <property name="spacing">
+               <number>5</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
               <item>
                <spacer name="horizontalSpacer">
                 <property name="orientation">
@@ -284,6 +565,21 @@ color: rgb(20, 20, 20);</string>
                   <height>50</height>
                  </size>
                 </property>
+                <property name="styleSheet">
+                 <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 100px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 10pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
+                </property>
                 <property name="text">
                  <string>Select All</string>
                 </property>
@@ -302,6 +598,21 @@ color: rgb(20, 20, 20);</string>
                   <width>16777215</width>
                   <height>50</height>
                  </size>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 100px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 10pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
                 </property>
                 <property name="text">
                  <string>Deselect All</string>
@@ -325,6 +636,21 @@ color: rgb(20, 20, 20);</string>
                 <property name="layoutDirection">
                  <enum>Qt::LayoutDirection::LeftToRight</enum>
                 </property>
+                <property name="styleSheet">
+                 <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	min-width: 150px;
+	height: 35px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 10pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
+                </property>
                 <property name="text">
                  <string>Reset to Default</string>
                 </property>
@@ -344,24 +670,82 @@ color: rgb(20, 20, 20);</string>
              <property name="minimumSize">
               <size>
                <width>0</width>
-               <height>0</height>
+               <height>100</height>
               </size>
+             </property>
+             <property name="maximumSize">
+              <size>
+               <width>16777215</width>
+               <height>700</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QTableView {
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTableView::item {
+	height: 35px;
+	font: 11pt &quot;Segoe UI&quot;;
+}
+QHeaderView::section {
+	height: 50px;
+	font: 700 12pt &quot;Segoe UI&quot;;
+}</string>
+             </property>
+             <property name="alternatingRowColors">
+              <bool>false</bool>
+             </property>
+             <property name="selectionMode">
+              <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+             </property>
+             <property name="cornerButtonEnabled">
+              <bool>false</bool>
              </property>
             </widget>
            </item>
            <item>
             <widget class="QFrame" name="frame_2">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QFrame {
+	border: 0px;
+}</string>
+             </property>
              <property name="frameShape">
               <enum>QFrame::Shape::NoFrame</enum>
              </property>
              <property name="frameShadow">
               <enum>QFrame::Shadow::Plain</enum>
              </property>
+             <property name="lineWidth">
+              <number>0</number>
+             </property>
              <layout class="QHBoxLayout" name="horizontalLayout">
+              <property name="spacing">
+               <number>5</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
               <item>
                <widget class="QPushButton" name="chimeraButton">
                 <property name="sizePolicy">
-                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                   <horstretch>0</horstretch>
                   <verstretch>0</verstretch>
                  </sizepolicy>
@@ -374,11 +758,28 @@ color: rgb(20, 20, 20);</string>
                 </property>
                 <property name="font">
                  <font>
+                  <family>Segoe UI</family>
                   <pointsize>12</pointsize>
+                  <italic>false</italic>
+                  <fontweight>DemiBold</fontweight>
                  </font>
                 </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Launches &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX&lt;/span&gt; to select slices to annotate.&lt;/p&gt;&lt;p&gt;The path to &lt;span style=&quot; font-weight:700;&quot;&gt;ChimeraX.exe&lt;/span&gt; must be specified in File &amp;gt; Settings.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
                 </property>
                 <property name="text">
                  <string>Launch ChimeraX</string>
@@ -388,7 +789,7 @@ color: rgb(20, 20, 20);</string>
               <item>
                <widget class="QPushButton" name="slicesButton">
                 <property name="sizePolicy">
-                 <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+                 <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
                   <horstretch>0</horstretch>
                   <verstretch>0</verstretch>
                  </sizepolicy>
@@ -401,11 +802,28 @@ color: rgb(20, 20, 20);</string>
                 </property>
                 <property name="font">
                  <font>
+                  <family>Segoe UI</family>
                   <pointsize>12</pointsize>
+                  <italic>false</italic>
+                  <fontweight>DemiBold</fontweight>
                  </font>
                 </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Extracts previously-marked slices to the slice directory for further segmentation in &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;. These are saved in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/slices&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
                 </property>
                 <property name="text">
                  <string>Extract Slices</string>
@@ -424,13 +842,49 @@ color: rgb(20, 20, 20);</string>
            </item>
            <item>
             <widget class="QFrame" name="frame_3">
+             <property name="sizePolicy">
+              <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+               <horstretch>0</horstretch>
+               <verstretch>0</verstretch>
+              </sizepolicy>
+             </property>
+             <property name="minimumSize">
+              <size>
+               <width>0</width>
+               <height>35</height>
+              </size>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QFrame {
+	border: 0px;
+	height: 35px;
+}</string>
+             </property>
              <property name="frameShape">
               <enum>QFrame::Shape::NoFrame</enum>
              </property>
              <property name="frameShadow">
               <enum>QFrame::Shadow::Plain</enum>
              </property>
+             <property name="lineWidth">
+              <number>0</number>
+             </property>
              <layout class="QHBoxLayout" name="horizontalLayout_4">
+              <property name="spacing">
+               <number>10</number>
+              </property>
+              <property name="leftMargin">
+               <number>0</number>
+              </property>
+              <property name="topMargin">
+               <number>0</number>
+              </property>
+              <property name="rightMargin">
+               <number>0</number>
+              </property>
+              <property name="bottomMargin">
+               <number>0</number>
+              </property>
               <item>
                <widget class="QLabel" name="featuresLabel">
                 <property name="sizePolicy">
@@ -441,11 +895,24 @@ color: rgb(20, 20, 20);</string>
                 </property>
                 <property name="font">
                  <font>
+                  <family>Segoe UI</family>
                   <pointsize>10</pointsize>
+                  <italic>false</italic>
+                  <fontweight>DemiBold</fontweight>
                  </font>
                 </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Labels for the annotated features. These can either be listed manually in descending order (i.e., decreasing pixel value in the mask image), or imported using the &lt;span style=&quot; font-weight:700;&quot;&gt;.json&lt;/span&gt; produced by exporting from &lt;span style=&quot; font-weight:700;&quot;&gt;Hasty.ai&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QFrame {
+	border: 0px;
+	width: 200px;
+	font: 600 10pt &quot;Segoe UI&quot;;
+}</string>
+                </property>
+                <property name="lineWidth">
+                 <number>0</number>
                 </property>
                 <property name="text">
                  <string>Labeled Features:</string>
@@ -462,11 +929,24 @@ color: rgb(20, 20, 20);</string>
                 </property>
                 <property name="font">
                  <font>
+                  <family>Segoe UI</family>
                   <pointsize>10</pointsize>
+                  <italic>false</italic>
+                  <bold>false</bold>
                  </font>
                 </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A comma-separated list of segmentation labels, in order of decreasing pixel value in the annotation .png.&lt;/p&gt;&lt;p&gt;The list can either be edited manually, or new features can be added with the + button on the right.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QLineEdit {
+    border: 2px solid gray;
+    border-radius: 10px;
+    padding: 0 8px;
+    background: white;
+    selection-background-color: darkgray;
+	font: 10pt &quot;Segoe UI&quot;;
+}</string>
                 </property>
                 <property name="placeholderText">
                  <string>list features labeled in order of decreasing annotation value</string>
@@ -481,8 +961,26 @@ color: rgb(20, 20, 20);</string>
                   <verstretch>0</verstretch>
                  </sizepolicy>
                 </property>
+                <property name="minimumSize">
+                 <size>
+                  <width>35</width>
+                  <height>0</height>
+                 </size>
+                </property>
                 <property name="toolTip">
                  <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add a feature to label. Must be already present in the annotations.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+                </property>
+                <property name="styleSheet">
+                 <string notr="true">QToolButton {
+	border: 2px solid #8f8f91;
+	border-radius: 5px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+}
+QToolButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
                 </property>
                 <property name="text">
                  <string/>
@@ -499,7 +997,7 @@ color: rgb(20, 20, 20);</string>
            <item>
             <widget class="QPushButton" name="annotButton">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -512,11 +1010,28 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
+               <family>Segoe UI</family>
                <pointsize>12</pointsize>
+               <italic>false</italic>
+               <fontweight>DemiBold</fontweight>
               </font>
              </property>
              <property name="toolTip">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Read finished annotations and add them to tomograms in &lt;span style=&quot; font-weight:700;&quot;&gt;project_root_dir/Tomograms&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
              </property>
              <property name="text">
               <string>Add Annotations</string>
@@ -536,17 +1051,43 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QGroupBox {
+	border: 2px solid gray;
+	border-radius: 5px;
+	margin-top: 4ex;
+	font: 600 12pt &quot;Segoe UI&quot;;
+}</string>
           </property>
           <property name="title">
            <string>Training Splits</string>
           </property>
           <layout class="QVBoxLayout" name="verticalLayout_8">
+           <property name="spacing">
+            <number>10</number>
+           </property>
+           <property name="leftMargin">
+            <number>10</number>
+           </property>
+           <property name="topMargin">
+            <number>10</number>
+           </property>
+           <property name="rightMargin">
+            <number>10</number>
+           </property>
+           <property name="bottomMargin">
+            <number>10</number>
+           </property>
            <item>
             <widget class="QPushButton" name="splitsButton">
              <property name="sizePolicy">
-              <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+              <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
                <horstretch>0</horstretch>
                <verstretch>0</verstretch>
               </sizepolicy>
@@ -559,11 +1100,28 @@ color: rgb(20, 20, 20);</string>
              </property>
              <property name="font">
               <font>
+               <family>Segoe UI</family>
                <pointsize>12</pointsize>
+               <italic>false</italic>
+               <fontweight>DemiBold</fontweight>
               </font>
              </property>
              <property name="toolTip">
               <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Add annotations to the existing tomogram files and generate training splits for &lt;span style=&quot; font-weight:700;&quot;&gt;cross-validation.&lt;/span&gt;&lt;/p&gt;&lt;p&gt;These are stored in a &lt;span style=&quot; font-weight:700;&quot;&gt;splits.csv&lt;/span&gt; file in the &lt;span style=&quot; font-weight:700;&quot;&gt;.CSV Directory&lt;/span&gt;.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+             </property>
+             <property name="styleSheet">
+              <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
              </property>
              <property name="text">
               <string>Generate Training Splits</string>
@@ -581,12 +1139,37 @@ color: rgb(20, 20, 20);</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_2">
         <item>
-         <widget class="QTreeView" name="trainView"/>
+         <widget class="QTreeView" name="trainView">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QTreeView {
+	alternate-background-color: rgb(215, 215, 215);
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTreeView::item {
+	height: 35px;
+	border: 1px solid gray;
+	font: 11pt &quot;Segoe UI&quot;;
+}</string>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="trainButton">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+           <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -599,11 +1182,28 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
           </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run training based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
           </property>
           <property name="text">
            <string>Generate Command</string>
@@ -618,12 +1218,37 @@ color: rgb(20, 20, 20);</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_4">
         <item>
-         <widget class="QTreeView" name="evalView"/>
+         <widget class="QTreeView" name="evalView">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QTreeView {
+	alternate-background-color: rgb(215, 215, 215);
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTreeView::item {
+	height: 35px;
+	border: 1px solid gray;
+	font: 11pt &quot;Segoe UI&quot;;
+}</string>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="evalButton">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -636,11 +1261,28 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
           </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run evaluation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
           </property>
           <property name="text">
            <string>Generate Command</string>
@@ -655,12 +1297,37 @@ color: rgb(20, 20, 20);</string>
        </attribute>
        <layout class="QVBoxLayout" name="verticalLayout_7">
         <item>
-         <widget class="QTreeView" name="segmentView"/>
+         <widget class="QTreeView" name="segmentView">
+          <property name="sizePolicy">
+           <sizepolicy hsizetype="Expanding" vsizetype="Preferred">
+            <horstretch>0</horstretch>
+            <verstretch>0</verstretch>
+           </sizepolicy>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QTreeView {
+	alternate-background-color: rgb(215, 215, 215);
+	border: 2px solid gray;
+	border-radius: 5px;
+}
+QTreeView::item {
+	height: 35px;
+	border: 1px solid gray;
+	font: 11pt &quot;Segoe UI&quot;;
+}</string>
+          </property>
+          <property name="alternatingRowColors">
+           <bool>true</bool>
+          </property>
+          <property name="selectionMode">
+           <enum>QAbstractItemView::SelectionMode::NoSelection</enum>
+          </property>
+         </widget>
         </item>
         <item>
          <widget class="QPushButton" name="segmentButton">
           <property name="sizePolicy">
-           <sizepolicy hsizetype="Expanding" vsizetype="Expanding">
+           <sizepolicy hsizetype="Expanding" vsizetype="Fixed">
             <horstretch>0</horstretch>
             <verstretch>0</verstretch>
            </sizepolicy>
@@ -673,11 +1340,28 @@ color: rgb(20, 20, 20);</string>
           </property>
           <property name="font">
            <font>
+            <family>Segoe UI</family>
             <pointsize>12</pointsize>
+            <italic>false</italic>
+            <fontweight>DemiBold</fontweight>
            </font>
           </property>
           <property name="toolTip">
            <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;Generates the CLI command to run segmentation based on the inputted settings. This command is copied to the clipboard, and also printed in the console below.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          </property>
+          <property name="styleSheet">
+           <string notr="true">QPushButton {
+	border: 2px solid #8f8f91;
+	border-radius: 15px;
+	height: 50px;
+	background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #f6f7fa, stop: 1 #dadbde);
+	font: 600 12pt &quot;Segoe UI&quot;;
+}
+QPushButton:pressed {
+    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,
+                                      stop: 0 #dadbde, stop: 1 #f6f7fa);
+}</string>
           </property>
           <property name="text">
            <string>Generate Command</string>
@@ -687,22 +1371,6 @@ color: rgb(20, 20, 20);</string>
        </layout>
       </widget>
      </widget>
-    </item>
-    <item>
-     <spacer name="verticalSpacer">
-      <property name="orientation">
-       <enum>Qt::Orientation::Vertical</enum>
-      </property>
-      <property name="sizeType">
-       <enum>QSizePolicy::Policy::Preferred</enum>
-      </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>20</width>
-        <height>10</height>
-       </size>
-      </property>
-     </spacer>
     </item>
     <item>
      <widget class="QGroupBox" name="consoleBox">
@@ -715,35 +1383,49 @@ color: rgb(20, 20, 20);</string>
       <property name="maximumSize">
        <size>
         <width>16777215</width>
-        <height>200</height>
+        <height>300</height>
        </size>
       </property>
       <property name="font">
        <font>
+        <family>Segoe UI</family>
         <pointsize>12</pointsize>
+        <italic>false</italic>
+        <fontweight>DemiBold</fontweight>
        </font>
       </property>
       <property name="focusPolicy">
        <enum>Qt::FocusPolicy::ClickFocus</enum>
       </property>
+      <property name="styleSheet">
+       <string notr="true">QGroupBox {
+	border: 2px solid gray;
+	border-radius: 5px;
+	margin-top: 4ex;
+	font: 600 12pt &quot;Segoe UI&quot;;
+}</string>
+      </property>
       <property name="title">
        <string>Console</string>
       </property>
+      <property name="alignment">
+       <set>Qt::AlignmentFlag::AlignLeading|Qt::AlignmentFlag::AlignLeft|Qt::AlignmentFlag::AlignTop</set>
+      </property>
       <layout class="QVBoxLayout" name="verticalLayout_3">
        <property name="spacing">
-        <number>1</number>
+        <number>0</number>
        </property>
        <property name="leftMargin">
-        <number>5</number>
+        <number>0</number>
        </property>
        <property name="topMargin">
-        <number>5</number>
+        <number>0</number>
        </property>
        <property name="rightMargin">
-        <number>5</number>
+        <number>0</number>
        </property>
        <property name="bottomMargin">
-        <number>5</number>
+        <number>0</number>
        </property>
        <item>
         <widget class="QTextBrowser" name="consoleText">
@@ -755,8 +1437,8 @@ color: rgb(20, 20, 20);</string>
          </property>
          <property name="font">
           <font>
-           <family>Segoe UI</family>
-           <pointsize>10</pointsize>
+           <family>Cascadia Code</family>
+           <pointsize>11</pointsize>
            <italic>false</italic>
            <bold>false</bold>
           </font>
@@ -765,10 +1447,14 @@ color: rgb(20, 20, 20);</string>
           <bool>false</bool>
          </property>
          <property name="styleSheet">
-          <string notr="true">background-color: rgb(90, 90, 90);
-color: rgb(255, 255, 255);
-border-color: rgb(90, 90, 90);
-font: 10pt &quot;Segoe UI&quot;;</string>
+          <string notr="true">QTextEdit {
+	color: #CCCCCC;
+	selection-color: rgb(255, 255, 255);
+	background-color: #0C0C0C;
+	border-color: #FFFFFF;
+	border-radius: 5px;
+	font: 11pt &quot;Cascadia Code&quot;;
+}</string>
          </property>
          <property name="frameShape">
           <enum>QFrame::Shape::WinPanel</enum>
@@ -781,6 +1467,16 @@ font: 10pt &quot;Segoe UI&quot;;</string>
          </property>
          <property name="readOnly">
           <bool>true</bool>
+         </property>
+         <property name="html">
+          <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
+&lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;meta charset=&quot;utf-8&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
+p, li { white-space: pre-wrap; }
+hr { height: 1px; border-width: 0; }
+li.unchecked::marker { content: &quot;\2610&quot;; }
+li.checked::marker { content: &quot;\2612&quot;; }
+&lt;/style&gt;&lt;/head&gt;&lt;body style=&quot; font-family:'Cascadia Code'; font-size:11pt; font-weight:400; font-style:normal;&quot;&gt;
+&lt;p style=&quot;-qt-paragraph-type:empty; margin-top:0px; margin-bottom:0px; margin-left:0px; margin-right:0px; -qt-block-indent:0; text-indent:0px; font-family:'Segoe UI'; font-size:9pt;&quot;&gt;&lt;br /&gt;&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="acceptRichText">
           <bool>true</bool>
@@ -802,11 +1498,29 @@ font: 10pt &quot;Segoe UI&quot;;</string>
      <x>0</x>
      <y>0</y>
      <width>800</width>
-     <height>25</height>
+     <height>24</height>
     </rect>
    </property>
    <property name="autoFillBackground">
     <bool>false</bool>
+   </property>
+   <property name="styleSheet">
+    <string notr="true">QMenuBar {
+	width: 50px;
+	font: 10pt &quot;Segoe UI&quot;;
+}
+QMenuBar::item {
+	spacing: 5px;
+	padding: 1px 4px;
+	background: transparent;
+	border-radius: 4px;
+}
+QMenuBar::item:selected {
+	background: #a8a8a8;
+}
+QMenuBar::item:pressed {
+	background: #AAAAAA;
+}</string>
    </property>
    <widget class="QMenu" name="menuFile">
     <property name="palette">
@@ -1008,6 +1722,22 @@ font: 10pt &quot;Segoe UI&quot;;</string>
       </disabled>
      </palette>
     </property>
+    <property name="styleSheet">
+     <string notr="true">QMenu {
+	margin: 2px;
+}
+QMenu::item {
+	padding: 2px 25px 2px 20px;
+	width: 100px;
+	height: 25px;
+	border: 1px solid transparent;
+	font: 9pt &quot;Segoe UI&quot;;
+}
+QMenu::item:selected {
+	border-color: darkblue;
+	background: rgba(100, 100, 100, 150);
+}</string>
+    </property>
     <property name="title">
      <string>File</string>
     </property>
@@ -1018,12 +1748,44 @@ font: 10pt &quot;Segoe UI&quot;;</string>
     <addaction name="actionSettings"/>
    </widget>
    <widget class="QMenu" name="menuHelp">
+    <property name="styleSheet">
+     <string notr="true">QMenu {
+	margin: 2px;
+}
+QMenu::item {
+	padding: 2px 25px 2px 20px;
+	width: 100px;
+	height: 25px;
+	border: 1px solid transparent;
+	font: 9pt &quot;Segoe UI&quot;;
+}
+QMenu::item:selected {
+	border-color: darkblue;
+	background: rgba(100, 100, 100, 150);
+}</string>
+    </property>
     <property name="title">
      <string>Help</string>
     </property>
     <addaction name="actionGithub"/>
    </widget>
    <widget class="QMenu" name="menuTools">
+    <property name="styleSheet">
+     <string notr="true">QMenu {
+	margin: 2px;
+}
+QMenu::item {
+	padding: 2px 25px 2px 20px;
+	width: 200px;
+	height: 25px;
+	border: 1px solid transparent;
+	font: 9pt &quot;Segoe UI&quot;;
+}
+QMenu::item:selected {
+	border-color: darkblue;
+	background: rgba(100, 100, 100, 150);
+}</string>
+    </property>
     <property name="title">
      <string>Tools</string>
     </property>

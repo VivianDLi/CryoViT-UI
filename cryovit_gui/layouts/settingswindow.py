@@ -12,11 +12,13 @@ from PyQt6 import QtCore, QtGui, QtWidgets
 class Ui_SettingsWindow(object):
     def setupUi(self, SettingsWindow):
         SettingsWindow.setObjectName("SettingsWindow")
-        SettingsWindow.resize(600, 800)
+        SettingsWindow.resize(800, 1000)
         font = QtGui.QFont()
         font.setPointSize(10)
         SettingsWindow.setFont(font)
         SettingsWindow.setLayoutDirection(QtCore.Qt.LayoutDirection.RightToLeft)
+        SettingsWindow.setStyleSheet("background-color: rgb(235, 235, 235);\n"
+"color: rgb(20, 20, 20);")
         self.verticalLayout = QtWidgets.QVBoxLayout(SettingsWindow)
         self.verticalLayout.setObjectName("verticalLayout")
         self.defaultButton = QtWidgets.QPushButton(parent=SettingsWindow)
@@ -25,14 +27,53 @@ class Ui_SettingsWindow(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.defaultButton.sizePolicy().hasHeightForWidth())
         self.defaultButton.setSizePolicy(sizePolicy)
+        self.defaultButton.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 150px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 10pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.defaultButton.setObjectName("defaultButton")
         self.verticalLayout.addWidget(self.defaultButton)
         self.settingsView = QtWidgets.QTreeView(parent=SettingsWindow)
         self.settingsView.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.settingsView.setStyleSheet("QTreeView {\n"
+"    alternate-background-color: rgb(215, 215, 215);\n"
+"    border: 2px solid gray;\n"
+"    border-radius: 5px;\n"
+"}\n"
+"QTreeView::item {\n"
+"    height: 35px;\n"
+"    border: 1px solid gray;\n"
+"    font: 11pt \"Segoe UI\";\n"
+"}")
+        self.settingsView.setAlternatingRowColors(True)
+        self.settingsView.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.NoSelection)
+        self.settingsView.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectItems)
         self.settingsView.setObjectName("settingsView")
         self.verticalLayout.addWidget(self.settingsView)
         self.buttonBox = QtWidgets.QDialogButtonBox(parent=SettingsWindow)
         self.buttonBox.setLayoutDirection(QtCore.Qt.LayoutDirection.LeftToRight)
+        self.buttonBox.setStyleSheet("QPushButton {\n"
+"    border: 2px solid #8f8f91;\n"
+"    border-radius: 15px;\n"
+"    min-width: 150px;\n"
+"    height: 35px;\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #f6f7fa, stop: 1 #dadbde);\n"
+"    font: 600 12pt \"Segoe UI\";\n"
+"}\n"
+"QPushButton:pressed {\n"
+"    background-color: qlineargradient(x1: 0, y1: 0, x2: 0, y2: 1,\n"
+"                                      stop: 0 #dadbde, stop: 1 #f6f7fa);\n"
+"}")
         self.buttonBox.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")

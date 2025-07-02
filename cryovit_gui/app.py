@@ -260,14 +260,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Setup views
         self.sampleView.setModel(self.sample_model)
+        self.sampleView.setSelectionBehavior(
+            self.sampleView.SelectionBehavior.SelectRows
+        )
         self.sampleView.selectionModel().currentChanged.connect(
             lambda current, _: self.tomogram_model.setSample(
                 self.sample_model.data(current, Qt.ItemDataRole.UserRole)
             )
         )
-        self.sampleView.setSelectionMode(self.sampleView.SelectionMode.SingleSelection)
         # Set header size
-        self.sampleView.horizontalHeader().setFixedHeight(50)
         self.sampleView.setColumnWidth(1, 100)
         self.sampleView.setColumnWidth(2, 100)
         self.sampleView.horizontalHeader().setSectionResizeMode(
@@ -280,7 +281,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.fileView.setModel(self.tomogram_model)
         # Set header size
-        self.fileView.horizontalHeader().setFixedHeight(50)
         self.fileView.setColumnWidth(1, 100)
         self.fileView.setColumnWidth(2, 100)
         self.fileView.horizontalHeader().setSectionResizeMode(
@@ -305,11 +305,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if not FileModel.validate_root(root_dir):
             self.projectDirectory.setText("")
         else:
+            previous_index = self.sampleView.selectionModel().currentIndex()
+            previous_row = previous_index.row() if previous_index.isValid() else None
             self.file_model = FileModel(
                 root_dir, self.file_model.file_data, update_selection=update_selection
             )
             self.sample_model.setSourceModel(self.file_model)
             self.tomogram_model.setSourceModel(self.file_model)
+            if previous_row is not None and previous_row in range(
+                self.sample_model.rowCount()
+            ):
+                self.sampleView.selectRow(previous_row)
 
     def _sync_files(self, *args):
         """Update the file model and views based on the current root directory."""
@@ -959,9 +965,14 @@ if __name__ == "__main__":
     app.setOrganizationName("Stanford University")
     app.setOrganizationDomain("stanford.edu")
     app.setStyle("Fusion")
-    app.setWindowIcon(QIcon(str(base_dir / "icons" / "cryovit.png")))
 
     window = MainWindow()
     window.show()
 
-    app.exec()
+    try:
+        app.exec()
+    except Exception as e:
+        exctype, value = sys.exc_info()[:2]
+        logger.error(
+            f"Unexpected exception when running application: {exctype}: {value}.\n{traceback.format_exc()}"
+        )
