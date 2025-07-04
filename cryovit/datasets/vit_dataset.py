@@ -64,8 +64,11 @@ class VITDataset(Dataset):
         """
         tomo_path = self.root / record
 
-        with h5py.File(tomo_path) as fh:
-            return fh["data"][()]
+        with h5py.File(tomo_path, "r") as fh:
+            if "data" in fh:
+                return fh["data"][()]
+            else:
+                return fh["MDF"]["images"]["0"]["image"][()]
 
     def _transform(self, data: NDArray[np.uint8]) -> torch.Tensor:
         """Applies normalization and resizing transformations to the tomogram.

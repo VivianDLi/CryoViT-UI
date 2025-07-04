@@ -36,8 +36,6 @@ def validate_config(cfg: InferModelConfig) -> None:
         logging.error("\n".join(error_msg))
         sys.exit(1)
 
-    OmegaConf.set_struct(cfg, False)
-
 
 @hydra.main(
     config_path="configs",
