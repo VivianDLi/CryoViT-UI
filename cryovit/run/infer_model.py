@@ -3,7 +3,7 @@
 import logging
 import os
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, List
 
 import h5py
 import numpy as np
@@ -13,7 +13,7 @@ from pytorch_lightning import Callback, LightningDataModule
 from pytorch_lightning import LightningModule
 from pytorch_lightning import Trainer
 
-from cryovit.config import ModelArch, InferModelConfig
+from cryovit.config import InferModelConfig
 
 torch.set_float32_matmul_precision("high")
 logging.getLogger("torch._dynamo").setLevel(logging.WARNING)
@@ -57,7 +57,7 @@ class TomoPredictionWriter(Callback):
         outputs = outputs.cpu().numpy().astype(np.float32)
         preds = np.where(outputs > 0.5, 1, 0).astype(np.uint8)  # binary classification
         # Save predictions to disk
-        with h5py.File(self.results_dir / batch["tomo_name"], "a") as fh:
+        with h5py.File(self.results_dir / batch["sample"] / batch["tomo_name"], "a") as fh:
             if "data" in fh:
                 del fh["data"]
             fh.create_dataset("data", data=data)
@@ -87,7 +87,6 @@ def build_datamodules(cfg: InferModelConfig) -> List[LightningDataModule]:
 
         dataset_params = {
             "input_key": input_key,
-            "label_key": model_config.label_key,
             "data_root": cfg.exp_paths.tomo_dir,
             "aux_keys": cfg.aux_keys,
         }

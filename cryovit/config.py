@@ -19,6 +19,8 @@ class Sample(Enum):
     Q109 = "Q109"
     Q18 = "Q18"
     Q66 = "Q66"
+    Young = "Young"
+    Aged = "Aged"
 
 
 samples = [sample.name for sample in Sample]

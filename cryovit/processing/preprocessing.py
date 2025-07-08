@@ -114,6 +114,7 @@ def run_preprocess(
     # normalize tomogram
     if normalize:
         data = normalize_data(data, clip)
+    dst_file.parent.mkdir(parents=True, exist_ok=True)
     # Save preprocessing parameters in a text file
     with open(dst_file.parent / (dst_file.stem + "_preprocessing.txt"), "w+") as f:
         f.write(f"Normalize: {normalize}\n")

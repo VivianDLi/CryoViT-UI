@@ -115,7 +115,7 @@ def process_sample(
                         f.name for f in src_dir.glob("*") if f.suffix in tomogram_exts
                     ]
                 }
-            )
+            )["tomo_name"]
         else:
             record_file = csv_dir / f"{s.name}.csv"
             records = pd.read_csv(record_file)["tomo_name"]
