@@ -39,7 +39,7 @@ def validate_config(cfg: EvalModelConfig) -> None:
 
 @hydra.main(
     config_path="configs",
-    config_name="eval_model.yaml",
+    config_name="eval_nn.yaml",
     version_base="1.2",
 )
 def main(cfg: EvalModelConfig) -> None:

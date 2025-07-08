@@ -8,10 +8,12 @@ import h5py
 import pandas as pd
 import torch
 import numpy as np
+from scipy.ndimage import center_of_mass
 from hydra.core.hydra_config import HydraConfig
 from hydra.utils import instantiate
 from pytorch_lightning import LightningDataModule
 from nnInteractive.inference.inference_session import nnInteractiveInferenceSession
+from huggingface_hub import snapshot_download
 
 from cryovit.config import EvalModelConfig, ExpPaths
 from cryovit.models.metrics import DiceMetric
@@ -96,25 +98,32 @@ def get_scores(
     scores = defaultdict(list)
     metric = DiceMetric(threshold=0.5)
     for data in datamodule.test_dataloader():
-        img = data["input"]
-        labels = data["labels"]
+        img = data["input"].numpy()
+        labels = data["label"].numpy()
+        if len(img.shape) == 3:
+            img = img[np.newaxis, :, :, :]
+            labels = labels[np.newaxis, :, :, :]
         session.set_image(img)
         ## Define Output Buffer ##
         target_tensor = torch.zeros(img.shape[1:], dtype=torch.uint8)
         session.set_target_buffer(target_tensor)
         ## Add interaction based on the center of labeled slices ##
-        int_point = torch.mean(labels)
+        int_point = center_of_mass(labels, labels=labels, index=1)[1:]
+        print("after point")
         session.add_point_interaction(int_point, include_interaction=True)
+        print("after interaction")
         ## Get Results ##
         results = session.target_buffer.clone()
+        print("after results")
         ## Save Results ##
         save_results(
-            img, labels, results, result_dir, data["sample"], data["tomo_name"]
+            img, labels, results.numpy(), result_dir, data["sample"], data["tomo_name"]
         )
+        print("after save")
         ## Add to Scores ##
         scores["sample"].append(data["sample"])
         scores["tomo_name"].append(data["tomo_name"])
-        score = metric(results, labels)
+        score = metric(results, torch.from_numpy(labels))
         scores["TEST_DiceMetric"].append(score.item())
         ## Start next image ##
         session.reset_interactions()
@@ -147,14 +156,28 @@ def run_trainer(cfg: EvalModelConfig) -> None:
     match dataset_type:
         case "single":
             result_dir = exp_paths.exp_dir.parent / "results"
+            model_dir = exp_paths.exp_dir.parent / "nn_model"
 
         case "multi":
             result_dir = exp_paths.exp_dir / "results" / split_dir
+            model_dir = exp_paths.exp_dir / "nn_model"
 
         case "loo" | "fractional":
             result_dir = exp_paths.exp_dir.parent / "results" / split_dir
+            model_dir = exp_paths.exp_dir.parent / "nn_model"
 
-    result_df = get_scores(session, exp_paths.exp_dir, result_dir, cfg)
+    # --- Download Trained Model Weights (~400MB) ---
+    REPO_ID = "nnInteractive/nnInteractive"
+    MODEL_NAME = "nnInteractive_v1.0"  # Updated models may be available in the future
+
+    download_path = snapshot_download(
+        repo_id=REPO_ID,
+        allow_patterns=[f"{MODEL_NAME}/*"],
+        local_dir=model_dir
+    )
+
+    model_path = os.path.join(model_dir, MODEL_NAME)
+    result_df = get_scores(session, model_path, result_dir, cfg)
     result_file = result_dir / "nnInteractive.csv"
     result_df.to_csv(result_file, index=False)
     print(result_df.describe())
