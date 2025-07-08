@@ -173,7 +173,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         # Setup thread pool and processes
         # Limit threads based on memory, assuming 5 GB per thread
-        thread_count = max(1, psutil.virtual_memory().available // (5 * 10 ^ 9))
+        thread_count = max(1, psutil.virtual_memory().available // (15 * 10 ** 9)) # max 15 GB per thread
         self.threadpool: QThreadPool = QThreadPool()
         self.threadpool.setMaxThreadCount(thread_count)
         self.progress_dict = {}  # progress bar update dict
