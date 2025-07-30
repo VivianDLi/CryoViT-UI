@@ -63,6 +63,7 @@ from cryovit_gui.processing import (
     add_annotations,
     create_dataset,
     generate_slices,
+    preprocess_dataset,
     generate_training_splits,
     get_all_tomogram_files,
 )
@@ -231,6 +232,50 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Copy to clipboard
         pyperclip.copy(command)
         logger.info(f"Copied pre-processing command to clipboard:\n{command}")
+        
+        local_run = QMessageBox.question(
+            self,
+            "Local Pre-processing",
+            f"Do you want to run pre-processing locally?",
+            buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            defaultButton=QMessageBox.StandardButton.Yes,
+        )
+        if local_run == QMessageBox.StandardButton.No:
+            return
+        
+        raw_dir = self.preprocessing_model.get_config(
+            ConfigKey(["raw_directory"])
+        ).get_value()
+        target_dir = self.preprocessing_model.get_config(
+            ConfigKey(["target_directory"])
+        ).get_value()
+        bin_size = self.preprocessing_model.get_config(ConfigKey(["bin_size"])).get_value()
+        resize = self.preprocessing_model.get_config(ConfigKey(["resize_image"])).get_value()
+        normalize = self.preprocessing_model.get_config(ConfigKey(["normalize"])).get_value()
+        clip = self.preprocessing_model.get_config(ConfigKey(["clip"])).get_value()
+        scale = self.preprocessing_model.get_config(ConfigKey(["scale"])).get_value()
+        
+        # Setup thread
+        process_worker = Worker(
+            partial(
+                preprocess_dataset(
+                    raw_dir,
+                    target_dir,
+                    bin_size=bin_size,
+                    resize=resize,
+                    normalize=normalize,
+                    clip=clip,
+                    scale=scale
+                )
+            )
+        )
+        process_worker.signals.finish.connect(
+            partial(logger.info, "Pre-processing complete.")
+        )
+        process_worker.signals.error.connect(
+            partial(self._handle_thread_exception, "Pre-processing")
+        )
+        self.threadpool.start(process_worker)
 
     def setup_annotation(self):
         """Setup the annotation tab in the main window."""
@@ -599,13 +644,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Check completion status
         annotations_present = self.file_model.file_data[sample]["exported"]
         if not all(annotations_present):
-            QMessageBox.warning(
+            continue_annotations = QMessageBox.question(
                 self,
-                "Annotations Required",
-                "Annotations missing for this sample. Please make sure exported annotations are present in the Annotations folder.",
-                buttons=QMessageBox.StandardButton.Ok,
+                "Incomplete Annotations",
+                "Annotations are missing for this sample. Please make sure all required exported annotations are present in the Annotations folder. If you choose to continue, any missing annotations will default to blank slices. Are you sure you want to continue?",
+                buttons=QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                defaultButton=QMessageBox.StandardButton.No,
             )
-            return
+            if continue_annotations == QMessageBox.StandardButton.No:
+                return
 
         # Setup thread
         annotations_worker = Worker(

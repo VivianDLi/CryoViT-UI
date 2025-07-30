@@ -10,6 +10,18 @@ class PreprocessingConfig(ConfigGroup):
     """Dataclass to hold preprocessing settings."""
 
     name: str = "Preprocessing Configuration"
+    raw_directory: ConfigField = ConfigField(
+        "Raw Data Directory",
+        input_type=ConfigInputType.DIRECTORY,
+        required=True,
+        description="Directory where the raw tomograms are stored.",
+    )
+    target_directory: ConfigField = ConfigField(
+        "Target Directory",
+        input_type=ConfigInputType.DIRECTORY,
+        required=True,
+        description="Directory where the pre-processed tomograms are stored.",
+    )
     bin_size: ConfigField = ConfigField(
         "Bin Size",
         input_type=ConfigInputType.NUMBER,
@@ -34,4 +46,10 @@ class PreprocessingConfig(ConfigGroup):
         input_type=ConfigInputType.BOOL,
         default=True,
         description="Whether to clip the tomogram data to 3 standard deviations.",
+    )
+    rescale: ConfigField = ConfigField(
+        "Rescale",
+        input_type=ConfigInputType.BOOL,
+        default=True,
+        description="Whether to rescale the tomogram data to between [-1, 1]."
     )

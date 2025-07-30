@@ -14,6 +14,8 @@ import pandas as pd
 from scipy import ndimage
 from sklearn.model_selection import KFold
 
+from cryovit_gui.processing.dataset import load_data
+
 #### Logging Setup ####
 
 import logging
@@ -53,22 +55,8 @@ def generate_slices(
         dst_file = dst_dir / tomo_name
 
         # Load the tomogram data
-        try:
-            with h5py.File(src_file, "r") as fh:
-                data = fh["data"][()]  # d, w, h
-        except OSError as e:
-            logger.error(
-                f"Error reading file {src_file}: {e}. Trying to load with mrcfile."
-            )
-            debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
-            data = None
-        try:
-            data = data if data is not None else mrcfile.read(src_file)
-        except OSError as e:
-            logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
-            debug_logger.error(
-                f"Error reading file {src_file} with mrcfile: {e}", exc_info=True
-            )
+        data = load_data(src_file)
+        if data == -1:
             continue
 
         # Save slices as images
@@ -118,23 +106,11 @@ def add_annotations(
         annot_file = annot_dir / tomo_name
 
         # Load the tomogram data
-        try:
-            with h5py.File(src_file, "r") as fh:
-                data = fh["data"][()]  # d, w, h
-        except OSError as e:
-            logger.error(
-                f"Error reading file {src_file}: {e}. Trying to load with mrcfile."
-            )
-            debug_logger.error(f"Error reading file {src_file}: {e}.", exc_info=True)
-            data = None
-        try:
-            data = data if data is not None else mrcfile.read(src_file)
-        except OSError as e:
-            logger.error(f"Error reading file {src_file} with mrcfile: {e}. Skipping.")
-            debug_logger.error(
-                f"Error reading file {src_file} with mrcfile: {e}", exc_info=True
-            )
+        data = load_data(src_file)
+        if data == -1:
             continue
+        data = 127.5 * (data + 1) # assumes data in [-1, 1]
+        data = data.astype(np.uint8)
 
         # Load annotations
         feature_labels = {feat: np.zeros_like(data, dtype=np.int8) for feat in features}
@@ -147,12 +123,18 @@ def add_annotations(
             if annot_path.exists():
                 annotation = np.asarray(Image.open(annot_path))
                 for i, labels in enumerate(feature_labels.values()):
+                    if annotation.shape != labels[idx].shape: # mismatched shapes, fix with 0-padding
+                        temp_label = np.zeros_like(labels[idx].shape, dtype=label.dtype)
+                        temp_label[:label.shape[0], :label.shape[1]] = label
+                        label = temp_label
                     label = np.where(annotation == 254 - i, 1, 0)
                     label = ndimage.binary_fill_holes(label)
-                    labels[idx] = label.astype(np.int8)
+                    labels[idx] = label.astype(np.uint8)
             else:
-                logger.warning(f"Annotation file {annot_path} not found. Skipping.")
-                continue
+                logger.warning(f"Annotation file {annot_path} not found. Using blank slices.")
+                for labels in feature_labels.values():
+                    label = np.zeros_like(labels[idx])
+                    labels[idx] = label.astype(np.uint8)
 
         # Save the tomogram with annotations
         with h5py.File(dst_file.with_suffix(".hdf"), "w") as fh:
@@ -160,6 +142,17 @@ def add_annotations(
             for feat in features:
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
 
+def _generate_splits(annotation_df: pd.DataFrame, sample: str, num_splits: int, seed: int) -> List[int]:
+    num_samples = annotation_df.shape[0]
+    K = num_samples if num_samples < num_splits or num_splits == 0 else num_splits
+    
+    kf = KFold(n_splits = K, shuffle=True, random_state=seed)
+    X = [[0] for _ in range(num_samples)]
+    split_id = [-1 for _ in range(num_samples)]
+    for fold_id, (_, test_ids) in enumerate(kf.split(X)):
+        for idx in test_ids:
+            split_id[idx] = fold_id
+    return split_id
 
 def generate_training_splits(
     splits_file: Path,
@@ -178,14 +171,14 @@ def generate_training_splits(
         seed (int, optional): Random seed for reproducibility. Defaults to 0.
     """
     annotation_df = pd.read_csv(csv_file)
-    n_samples = annotation_df.shape[0]
-    n_splits = n_samples if n_samples < num_splits or num_splits == 0 else num_splits
-    kf = KFold(n_splits=n_splits, shuffle=True, random_state=seed)
-    X = [[0] for _ in range(n_samples)]
-    annotation_df["split_id"] = -1
-    for fold_id, (_, test_ids) in enumerate(kf.split(X)):
-        for idx in test_ids:
-            annotation_df.at[idx, "split_id"] = fold_id
+    
+    annotation_df["split_loo"] = _generate_splits(annotation_df, sample, 0, seed)
+    annotation_df["split_5"] = _generate_splits(annotation_df, sample, 5, seed)
+    annotation_df["split_10"] = _generate_splits(annotation_df, sample, 10, seed)
+    if num_splits not in [0, 5, 10]:
+        splits = _generate_splits(annotation_df, sample, num_splits, seed)
+        annotation_df[f"split_{num_splits}"] = splits
+    
     annotation_df["sample"] = (
         annotation_df["tomo_name"][0].split("_")[1] if sample is None else sample
     )
