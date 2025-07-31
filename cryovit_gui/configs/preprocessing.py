@@ -1,6 +1,7 @@
 """Dataclasses to hold pre-processing configuration for the CryoViT GUI application."""
 
 from dataclasses import dataclass
+from pathlib import Path
 
 from cryovit_gui.config import ConfigInputType, ConfigField, ConfigGroup
 
@@ -13,12 +14,14 @@ class PreprocessingConfig(ConfigGroup):
     raw_directory: ConfigField = ConfigField(
         "Raw Data Directory",
         input_type=ConfigInputType.DIRECTORY,
+        default=Path("data/tomograms"),
         required=True,
         description="Directory where the raw tomograms are stored.",
     )
     target_directory: ConfigField = ConfigField(
         "Target Directory",
         input_type=ConfigInputType.DIRECTORY,
+        default=Path("data/processed"),
         required=True,
         description="Directory where the pre-processed tomograms are stored.",
     )

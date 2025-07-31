@@ -253,20 +253,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         resize = self.preprocessing_model.get_config(ConfigKey(["resize_image"])).get_value()
         normalize = self.preprocessing_model.get_config(ConfigKey(["normalize"])).get_value()
         clip = self.preprocessing_model.get_config(ConfigKey(["clip"])).get_value()
-        scale = self.preprocessing_model.get_config(ConfigKey(["scale"])).get_value()
+        rescale = self.preprocessing_model.get_config(ConfigKey(["rescale"])).get_value()
         
         # Setup thread
         process_worker = Worker(
             partial(
-                preprocess_dataset(
-                    raw_dir,
-                    target_dir,
-                    bin_size=bin_size,
-                    resize=resize,
-                    normalize=normalize,
-                    clip=clip,
-                    scale=scale
-                )
+                preprocess_dataset,
+                raw_dir,
+                target_dir,
+                bin_size=bin_size,
+                resize=resize,
+                normalize=normalize,
+                clip=clip,
+                rescale=rescale
             )
         )
         process_worker.signals.finish.connect(
@@ -584,7 +583,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Check completion status
         sample_df = pd.read_csv(csv_file)
-        annotated = len(sample_df["tomo_name"])
+        annotated = len(sample_df["tomo_name"]) - 1
         total = self.tomogram_model.rowCount()
 
         if annotated < total:
@@ -625,16 +624,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             logger.warning("No sample selected.")
             return
         tomogram_dir = self.file_model.get_directory("tomograms")
+        result_dir = self.file_model.get_directory("tomo_annot")
         csv_dir = self.file_model.get_directory("csv")
-        slices_dir = self.file_model.get_directory("slices")
-        if not all([tomogram_dir, csv_dir, slices_dir]):
+        annot_dir = self.file_model.get_directory("annotations")
+        if not all([tomogram_dir, csv_dir, annot_dir]):
             logger.warning(
                 "One or more required directories (tomograms, csv, slices) are not available."
             )
             return
         src_dir = tomogram_dir / sample
+        dst_dir = result_dir / sample
         csv_file = csv_dir / f"{sample}.csv"
-        slices_dir = slices_dir / sample
+        annot_dir = annot_dir / sample
         if not csv_file.exists():
             logger.warning(
                 f"No CSV file found for sample {sample} in {csv_file}. Please run the ChimeraX annotation first."
@@ -659,8 +660,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             partial(
                 add_annotations,
                 src_dir,
-                src_dir,
-                slices_dir,
+                dst_dir,
+                annot_dir,
                 csv_file,
                 self.features,
             )
@@ -679,14 +680,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         num_splits = self.training_model.get_config(
             ConfigKey(["trainer", "num_splits"])
         ).get_value()
-        seed = self.training_model.get_config(
-            ConfigKey(["trainer", "random_seed"])
-        ).get_value()
-        if not self.features:
-            logger.warning(
-                "No labeled features inputed. Please add annotated features above."
-            )
-            return
 
         # Check for directories
         if not self.file_model.file_data:
@@ -725,13 +718,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # Setup thread
         splits_worker = Worker(
             partial(
-                generate_training_splits(
-                    splits_file,
-                    csv_file,
-                    sample=sample,
-                    num_splits=num_splits,
-                    seed=seed,
-                )
+                generate_training_splits,
+                splits_file,
+                csv_file,
+                sample=sample,
+                num_splits=num_splits,
             )
         )
         splits_worker.signals.finish.connect(

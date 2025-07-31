@@ -4,9 +4,8 @@ import os
 import shutil
 from pathlib import Path
 from PIL import Image
-from typing import List
+from typing import List, Optional
 
-import mrcfile
 from tqdm import tqdm
 import h5py
 import numpy as np
@@ -55,8 +54,8 @@ def generate_slices(
         dst_file = dst_dir / tomo_name
 
         # Load the tomogram data
-        data = load_data(src_file)
-        if data == -1:
+        data, ok = load_data(src_file)
+        if not ok:
             continue
 
         # Save slices as images
@@ -73,6 +72,21 @@ def generate_slices(
                     f"Slice index {idx} out of bounds for {tomo_name}. Skipping."
                 )
 
+def _fill_small_holes(label: np.ndarray, min_area: float = 50.0) -> np.ndarray:
+    """Fills holes in a binary image with an area smaller than min_area. This is to prevent from filling in cristae labels."""
+    inverted = -label + 1
+    # Label connected components (i.e., holes)
+    holes, num_features = ndimage.label(inverted)
+    # Create a mask for large holes
+    large_holes_mask = np.zeros_like(inverted, dtype=bool)
+    for i in range(1, num_features + 1):
+        area = np.sum(holes == i)
+        if area > min_area:
+            large_holes_mask[holes == i] = True
+            
+    # Filter initial label by mask
+    label[~large_holes_mask] = 1
+    return label 
 
 def add_annotations(
     src_dir: Path,
@@ -106,11 +120,13 @@ def add_annotations(
         annot_file = annot_dir / tomo_name
 
         # Load the tomogram data
-        data = load_data(src_file)
-        if data == -1:
+        data, ok = load_data(src_file)
+        if not ok:
             continue
-        data = 127.5 * (data + 1) # assumes data in [-1, 1]
-        data = data.astype(np.uint8)
+        # Switch from [-1, 1] to [0, 255] if necessary
+        if np.max(data) <= 1: # data has been normalized, clipped, and scaled
+            data = 127.5 * (data + 1) # assumes data in [-1, 1]
+            data = data.astype(np.uint8)
 
         # Load annotations
         feature_labels = {feat: np.zeros_like(data, dtype=np.int8) for feat in features}
@@ -122,27 +138,34 @@ def add_annotations(
             annot_path = annot_file.parent / f"{annot_file.stem}_{idx}.png"
             if annot_path.exists():
                 annotation = np.asarray(Image.open(annot_path))
-                for i, labels in enumerate(feature_labels.values()):
-                    if annotation.shape != labels[idx].shape: # mismatched shapes, fix with 0-padding
-                        temp_label = np.zeros_like(labels[idx].shape, dtype=label.dtype)
-                        temp_label[:label.shape[0], :label.shape[1]] = label
-                        label = temp_label
+                labels = set(np.unique(annotation)) - set([0])
+                if len(labels) != len(feature_labels):
+                    logger.warning(f"Number of labels in {annot_path} does not match expected labels ({len(feature_labels)}): {labels}.")
+                for i, feat in enumerate(feature_labels):
+                    if annotation.shape != feature_labels[feat][idx].shape: # mismatched shapes, fix with 0-padding
+                        logger.info(f"Mismatched label {i} shape for {annot_path} ({annotation.shape} vs. {feature_labels[feat][idx].shape}). Fixing with padding.")
+                        temp_label = np.zeros_like(feature_labels[feat][idx], dtype=annotation.dtype)
+                        temp_label[:annotation.shape[0], :annotation.shape[1]] = annotation
+                        annotation = temp_label
                     label = np.where(annotation == 254 - i, 1, 0)
-                    label = ndimage.binary_fill_holes(label)
-                    labels[idx] = label.astype(np.uint8)
+                    label = _fill_small_holes(label)
+                    # Handle overlapping annotations between cristae and mitochondria
+                    if feat == "mito":
+                        label = ndimage.binary_fill_holes(label)
+                    feature_labels[feat][idx] = label
             else:
                 logger.warning(f"Annotation file {annot_path} not found. Using blank slices.")
-                for labels in feature_labels.values():
-                    label = np.zeros_like(labels[idx])
-                    labels[idx] = label.astype(np.uint8)
+                for feat in feature_labels:
+                    label = np.zeros_like(feature_labels[feat][idx], dtype=np.int8)
+                    feature_labels[feat][idx] = label
 
         # Save the tomogram with annotations
         with h5py.File(dst_file.with_suffix(".hdf"), "w") as fh:
-            fh.create_dataset("data", data=data)
-            for feat in features:
+            fh.create_dataset("data", data=data, compression="gzip")
+            for feat in feature_labels:
                 fh.create_dataset(feat, data=feature_labels[feat], compression="gzip")
 
-def _generate_splits(annotation_df: pd.DataFrame, sample: str, num_splits: int, seed: int) -> List[int]:
+def _generate_splits(annotation_df: pd.DataFrame, num_splits: int, seed: Optional[int] = None) -> List[int]:
     num_samples = annotation_df.shape[0]
     K = num_samples if num_samples < num_splits or num_splits == 0 else num_splits
     
@@ -151,7 +174,7 @@ def _generate_splits(annotation_df: pd.DataFrame, sample: str, num_splits: int, 
     split_id = [-1 for _ in range(num_samples)]
     for fold_id, (_, test_ids) in enumerate(kf.split(X)):
         for idx in test_ids:
-            split_id[idx] = fold_id
+            split_id[idx] = int(fold_id)
     return split_id
 
 def generate_training_splits(
@@ -159,7 +182,7 @@ def generate_training_splits(
     csv_file: Path,
     sample: str = None,
     num_splits: int = 10,
-    seed: int = 0,
+    seed: Optional[int] = None,
 ) -> None:
     """Create splits for cross-validation.
 
@@ -172,12 +195,10 @@ def generate_training_splits(
     """
     annotation_df = pd.read_csv(csv_file)
     
-    annotation_df["split_loo"] = _generate_splits(annotation_df, sample, 0, seed)
-    annotation_df["split_5"] = _generate_splits(annotation_df, sample, 5, seed)
-    annotation_df["split_10"] = _generate_splits(annotation_df, sample, 10, seed)
-    if num_splits not in [0, 5, 10]:
-        splits = _generate_splits(annotation_df, sample, num_splits, seed)
-        annotation_df[f"split_{num_splits}"] = splits
+    annotation_df["split_loo"] = _generate_splits(annotation_df, 0, seed)
+    annotation_df["split_5"] = _generate_splits(annotation_df, 5, seed)
+    annotation_df["split_10"] = _generate_splits(annotation_df, 10, seed)
+    annotation_df["split_id"] = _generate_splits(annotation_df, num_splits, seed)
     
     annotation_df["sample"] = (
         annotation_df["tomo_name"][0].split("_")[1] if sample is None else sample
@@ -194,4 +215,12 @@ def generate_training_splits(
     splits_df = splits_df[~splits_df["tomo_name"].isin(annotation_df["tomo_name"])]
     # append new rows to the splits_df
     splits_df = pd.concat([splits_df, annotation_df], ignore_index=True)
+    
+    try:
+        splits_df["split_loo"] = splits_df["split_loo"].astype(int)
+        splits_df["split_5"] = splits_df["split_5"].astype(int)
+        splits_df["split_10"] = splits_df["split_10"].astype(int)
+        splits_df["split_id"] = splits_df["split_id"].astype(int)
+    except:
+        pass
     splits_df.to_csv(splits_file, mode="w", index=False)
