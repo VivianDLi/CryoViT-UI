@@ -1,56 +1,75 @@
 # CryoVIT: Efficient Segmentation of Cryo-electron Tomograms with Vision Foundation Models
 
 ## Installation Instructions
+This codebase only contains a GUI to help setup data for running CryoViT training. The CryoViT code repository is also required, which can be downloaded [here]([https://github.com/sanketx/CryoVIT).
 
-Distribution-specific installers can be found in `releases`.
+Distribution-specific installers can be found in `releases`, but these are untested, so follow the instructions for [Building from Source Code](#Building from Source Code) below.
 
 ### Building from Source Code
 
-The CryoViT GUI uses `mamba` to manage python packages and dependencies and can be downloaded [here](https://github.com/conda-forge/miniforge). You should also be able to use `conda` instead of Mamba but setting up the environment may take an unreasonably long time.
+Both CryoViT GUI and CryoViT use `mamba` to manage python packages and dependencies, which can be downloaded [here](https://github.com/conda-forge/miniforge). You should also be able to use `conda` instead of Mamba but setting up the environment may take an unreasonably long time.
 
 To setup the environment:
 
 1. Clone this github repository: `git clone https://github.com/VivianDLi/CryoViT-UI.git`
 2. Go into the project directory: `cd CryoViT-UI`
-3. Build the application: `make install`
+3. Setup the mamba environment: `mamba env create -f env.yml`
+4. Activate the mamba environment: `mamba activate cryovit_gui_env`
+5. Setup the python package (this step should only need to be done once): `pip install -e .`
 
-Or, 3. Setup the mamba environment: `mamba env create -f env.yml` 4. Activate the mamba environment: `mamba activate cryovit_gui_env` 5. Launch the application with python: `python cryovit_gui/app.py`
+The same steps can be followed to setup CryoViT, only replacing `CryoViT-UI` with `CryoViIT` and `cryovit_gui_env` with `cryovit_env`.
 
 ## Usage Guide
 
 This application is meant to be used in conjunction with the [CryoViT source code](https://github.com/sanketx/CryoVIT), and as such, does not support model training or inference out of the box. Instead, the main use is to help format the commands to train and run CryoViT models, and to facilitate the annotation process for training CryoViT.
 
-The application is split into 5 main tabs, and some additional utility functions found in the menu bar.
+To train and use a model from scratch, follow the following protocol:
 
-### Pre-processing
+### 1. Setup your dataset directory:
 
-The **pre-processing** tab is used to generate the CLI command to run pre-processing using the CryoViT python library. Pre-processing configuration settings can be edited by _double-clicking_ on config values in the main window.
+CryoViT expects your data to be in the following structure:
 
-When finished, the CLI command to run can be generated using the `Generate Command` button at the bottom. This will copy the command to your clipboard to paste into a terminal with `Ctrl + V`. Additionally, the command will be printed in the console log at the bottom.
+```
++-- Data (can be any name)
+|  +-- tomograms
+|  +-- csv
+|  +-- slices
+|  +-- annotations
+```
 
-Model performance relies heavily on the input data having the same pre-processing steps as the training data, so pre-processing your data is important.
+You can put your `raw training data` in a `raw` folder (or something similar) in the `Data` directory. This data is expected to be organized into `samples` (i.e., subfolders containing either `.mrc` or `.hdf` tomogram files). If you just have a bunch of tomograms, just create a new sample folder in your `raw` folder with the tomograms inside.
 
-### Annotations
+### 2. Pre-processing:
 
-The **annotations** tab is used to setup training data for model training. This includes:
+Launch the CryoViT GUI by running `cryovit_gui/app.py` with the `cryovit_gui_env` environment activated (see (Building from Source Code)(#Building from Source Code)).
 
-- selecting a subset of slices to annotate per tomogram
-- exporting those slices as `.png` files to annotate in `Hasty.ai` or some other annotation software
-- importing annotated segmentation masks back into tomogram files
-- creating a `.csv` file with information about the annotated slices and the tomogram for training
-- optionally, generating splits for cross-validation
+The application will open on the **pre-processing tab**, with two main sections, a dropdown configuration setter and a button. Using the dropdown, setup the pre-processing settings and directories.
 
-1. Select the `project root directory`. This is the parent folder that contains all of the training data. This can either be manually typed into the text box, or selected from a folder selection dialog with the button on the right.
+By default, you should only need to specify the `Raw Data Directory` (this should be your `raw` folder, or something similar), and the `Target Directory` (this should be your `tomograms` folder).
+> **__Directory Selection__**: Double-clicking config values (i.e., the right column) allows you to **edit** their values.
+> For directories, *single-clicking* in edit-mode opens a file-select screen, while *double-clicking* in edit-mode allows manual text editing.
 
-This root directory must have a specific structure, containing a `tomograms` folder with the raw or pre-processed tomogram files organized into **sample** folders, a `csv` folder, where `.csv` files will be saved, and a `slices` folder, where exported slices will be saved for annotation. The application will also provide warnings if this directory structure is not met.
+When the config is setup, click the button to run pre-processing. This will copy a command into your clipboard that can be pasted and run in the CryoViT environment to run pre-processing, or you can use the dialog box to run pre-processing locally (i.e., using the GUI).
 
-From there, all sample sub-directories in the `tomograms` folder will be read, and their progress displayed (i.e., how many tomograms have had slices extracted, or annotations found).
+### 3. Selecting Annotation Slices:
 
-2. Select a sample to produce annotations for. All tomogram files for that sample will then be shown in the section below. From there, you can select specific tomograms to select slices for, or use the `Select All`, `Deselect All`, or `Reset to Default` buttons.
+CryoViT is a minimally-supervised model (i.e., it trains using a small number of annotated data). This is typically 5 good-quality slices in each training tomogram that are annotated with what you want to segment. The **Annotations** tab (next to the **Pre-processing** tab) is used to select and setup these slices.
 
-In general, **green** means that the tomogram file or sample has been fully completed (i.e., slices extracted and annotations present in an `annotations` folder).
+First, select the `Project Root Directory` at the top. This should be your `Data` directory. This can either be manually entered using the text box, or selected with a prompt using the button on the right. The application will provide warnings and the root directory will not be set if the selected directory doesn't follow the structure specified in (Step 1)(#1. Setup your dataset directory:).
 
-3. Press the `Launch ChimeraX` button to open ChimeraX to extract slices. This requires the path to your ChimeraX executable to be set in the application [settings](#settings).
+With the root directory selected, all `sample` sub-directories will be shown in the section below, with the current progress displayed, and completed samples highlighted in green. The progress indicates how many tomograms in each sample have either: (1) had slices extracted to later be annotated, or (2) have annotations present in an `annotations` folder.
+
+To select which slices to annotate, select a sample, and then, in the section below, check all tomograms that you want to select for. Tomograms with no extracted slices are automatically selected by default, and the **Select All**, **Deselect All**, and **Reset to Default**, change your selections appropriately.
+
+Then, press the `Launch ChimeraX` button to open ChimeraX to select slices to later annotate.
+> **__Specifying ChimeraX Settings__**: The path to your ChimeraX executable needs to be set in the application settings before this step.
+> This is accessed through the File Menu > Settings (Preferences on Mac), and under the **Annotation** dropdown, set the `Chimera Path` settings. The `Number of Slices` setting can also be set to specify the number of slices to use as training data (by default, 5).
+
+> **__Finding the ChimeraX Path__**: On **Windows**, the ChimeraX path is a `ChimeraX.exe` file in your ChimeraX install location in the `bin` folder.
+> On **Linux**, setting this is not necessary.
+> On **Mac**, this should be a `ChimeraX` file in the `Contents/MacOS/` directory of your ChimeraX application location (e.g., `Applications/ChimeraX.app/Contents/MacOS/ChimeraX`).
+
+#### 3.i. Using ChimeraX to Select Slices:
 
 When launching ChimeraX, a command will be saved to your clipboard. When ChimeraX successfully launches, paste and run that command in the ChimeraX command line. This will open a tomogram to select z-limits and slices for.
 
@@ -62,31 +81,52 @@ When finished, type `next` in the ChimeraX command line to save your z-limits an
 
 At any point, if you want to stop, simply close ChimeraX. Progress is saved whenever you type `next`. When all selected tomograms have been marked, you can close ChimeraX.
 
-4. Press the `Extract Slices` button to export slices selected with ChimeraX as `.png` for annotation elsewhere (e.g., `Hasty.ai`). If not all tomograms in the sample have been processed, a warning will be shown, and missing tomograms can be easily found by looking in the `Slices Exported?` column.
+### 4. Annotating Slices:
 
-When you have finished annotating your slices, export them as segmentation masks and put them in an `annotations` folder under the `project root directory` (i.e., `project_root/annotations/sample/segmentation.png`).
+You can double-check you've selected slices for all training tomograms with the `Slices exported?` or `Slice Progress` columns. When all tomograms are completed, press the `Extract Slices` button to export slices as `.png` images for annotation in [_Hasty.ai_](app.hasty.ai). If not all tomograms in the sample have been processed, a warning will be shown, and missing tomograms can be easily found by looking in the `Slices Exported?` column.
 
-These segmentation masks should be grayscale and have a 0-value for non-labeled pixels, and values starting from 254 and decreasing per label. So, for a slice labeled with mitochondria and cristae, pixels equal to 254 would be mitochondria, and pixels equal to 253 would be cristae. If using `Hasty.ai`, this is automatically done for you by exporting annotations in `decreasing` mode.
+In Hasty, you can import your slices at `Content > Import Annotations`, and start annotating them using the `Start annotating` button on the top left.
+> **__Annotation Tips**: Remember important keybinds, like `B` to enable brush mode, `E` to enable eraser, and `Shift + F` to fill any holes.
+> For large objects, I recommend outlining the shape, and then using `Shift + F` to fill in the outlines.
+> Ergonomically, I recommend using a tablet, having the non-pen hand on a keyboard for shortcuts.
+> Don't be afraid to use `Ctrl + Z` for undoing bad lines, or `Ctrl + Shift + Z` for redos. Also helpful are `Shift + N` and `Shift + B` for moving to the next or previous slices respectively.
 
-5. After inputting the annotation labels as a comma-separated list in decreasing order, press the `Add Annotations` button to add the segmentation masks to the original tomogram files.
+When you have finished annotating your slices, export them as segmentation masks (`Content > Export data`; use `grayscale descending` pixel order and order by `z-value`) and put them in an `annotations` folder under the `project root directory` (i.e., `project_root/annotations/sample/segmentation.png`).
 
-Optionally, if exporting from `Hasty.ai`, a `.json` file will be included in the annotations directory containing the annotation labels. Using the button on the right of the labels text box, you can import labels from this file.
+### 5. Creating Training Data and Splits:
 
-6. When all samples have been processed (i.e., all highlighted with green), press `Generate Training Splits` to generate cross-validation training and evaluation splits for CryoViT.
+With your annotations present (double-checking that the `Annotation Progress` column is green, or correct), specify the annotation labels as a comma-separated list in decreasing pixel-value order. Alternatively, if exporting from _Hasty_, use the button to the right of the labels text box to specify the `.json` file included in the _Hasty_ export.
 
-### Model Training
+Then, press the `Add Annotations` button to add your annotations to the original tomograms, which will serve as the input for CryoViT. These are saved in a `tomo_annot` folder in your `Data` directory.
 
-### Model Evaluation
+After adding annotations, create training splits using the `Generate Training Splits` button (this needs to be done per sample). If this is the first sample, create an empty `splits.csv` file in the `csv` directory, and select this file when asked for a "splits file". 
 
-### Model Inference
+After the training data and splits.csv file have been created, the dataset is now setup for CryoViT training and evaluation. The entire `Data` folder can then be sent to the cluster to use cluster gpus for training.
 
-### Tools
+### 6. Training and Evaluation
+
+For new datasets, add any new samples created to the `Sample` enum in `CryoVIT/cryovit/config.py`.
+Additionally, change the entries under `exp_paths` in `CryoVIT/cryovit/configs/{dino_features.yaml/train_model.yaml/eval_model.yaml}` to the corresponding directories.
+
+Then, from the `CryoViIT` directory with `cryovit_env` activated, extract DINOv2 features with `python -m cryovit.dino_features sample=[your_sample]`.
+
+For just one sample, run training with `python -m cryovit.train_model model=cryovit label_key=[label_to_segment_for] exp_name=[unique_identifier_for_your_experiment] dataset=single dataset.sample=[your_sample]`.
+For multiple samples, run training with `python -m cryovit.train_model model=cryovit label_key=[label_to_segment_for] exp_name=[unique_identifier_for_your_experiment] dataset=multi datset.sample=[your_sample_1,your_sample_2,...]`.
+> **__Training a different model__**: Replace `model=cryovit` with whatever model you want to train. Currently, only a 3D U-Net model is available (`model=unet3d`).
+
+When the model is trained on some data, the rest of the slices for that data can be segmented using the trained model in evaluation mode:
+`python -m cryovit.eval_model model=cryovit label_key=[label_to_segment_for] exp_name=[same_exp_name_as_training] dataset=[same_as_training] dataset.sample=[same_as_training]`
+
+The results should be in the `exp_dir` you've specified in the `.yaml` file.
+> **__Future Notes__**: This experiment directory setup is currently being re-worked. When this refactor is finalized, the CryoViT codebase will be updated accordingly.
+
+## Tools
 
 The `Tools` menu provides basic utility functions for ease-of-use.
 
 `Tools > Format Downloaded Data` is for automatically detecting tomograms from downloaded datasets (e.g., CZI), and moves them into the directory structure required by CryoViT.
 
-### Settings
+## Settings
 
 The application settings control application-wide defaults, including which directory file selection dialogs start from, and how many slices to annotate per training tomogram.
 
@@ -94,7 +134,7 @@ Settings can be changed through `File > Settings` in the menu bar. Like the main
 
 Pressing `Ok` on the Settings window will save your current settings, and will be loaded the next time you open the application (unlike tab configurations). Pressing `Cancel` will revert all settings to how they were before.
 
-#### Presets
+### Presets
 
 Settings can also be saved and loaded from **presets**. These are also accessed under the `File` menu.
 
