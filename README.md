@@ -3,7 +3,7 @@
 ## Installation Instructions
 This codebase only contains a GUI to help setup data for running CryoViT training. The CryoViT code repository is also required, which can be downloaded [here]([https://github.com/sanketx/CryoVIT).
 
-Distribution-specific installers can be found in `releases`, but these are untested, so follow the instructions for [Building from Source Code](#Building from Source Code) below.
+Distribution-specific installers can be found in `releases`, but these are untested, so follow the instructions for [Building from Source Code](#Building-from-Source-Code) below.
 
 ### Building from Source Code
 
@@ -41,12 +41,13 @@ You can put your `raw training data` in a `raw` folder (or something similar) in
 
 ### 2. Pre-processing:
 
-Launch the CryoViT GUI by running `cryovit_gui/app.py` with the `cryovit_gui_env` environment activated (see (Building from Source Code)(#Building from Source Code)).
+Launch the CryoViT GUI by running `cryovit_gui/app.py` with the `cryovit_gui_env` environment activated (see [Building from Source Code](#Building-from-Source-Code)).
 
 The application will open on the **pre-processing tab**, with two main sections, a dropdown configuration setter and a button. Using the dropdown, setup the pre-processing settings and directories.
 
 By default, you should only need to specify the `Raw Data Directory` (this should be your `raw` folder, or something similar), and the `Target Directory` (this should be your `tomograms` folder).
 > **__Directory Selection__**: Double-clicking config values (i.e., the right column) allows you to **edit** their values.
+> 
 > For directories, *single-clicking* in edit-mode opens a file-select screen, while *double-clicking* in edit-mode allows manual text editing.
 
 When the config is setup, click the button to run pre-processing. This will copy a command into your clipboard that can be pasted and run in the CryoViT environment to run pre-processing, or you can use the dialog box to run pre-processing locally (i.e., using the GUI).
@@ -55,7 +56,7 @@ When the config is setup, click the button to run pre-processing. This will copy
 
 CryoViT is a minimally-supervised model (i.e., it trains using a small number of annotated data). This is typically 5 good-quality slices in each training tomogram that are annotated with what you want to segment. The **Annotations** tab (next to the **Pre-processing** tab) is used to select and setup these slices.
 
-First, select the `Project Root Directory` at the top. This should be your `Data` directory. This can either be manually entered using the text box, or selected with a prompt using the button on the right. The application will provide warnings and the root directory will not be set if the selected directory doesn't follow the structure specified in (Step 1)(#1. Setup your dataset directory:).
+First, select the `Project Root Directory` at the top. This should be your `Data` directory. This can either be manually entered using the text box, or selected with a prompt using the button on the right. The application will provide warnings and the root directory will not be set if the selected directory doesn't follow the structure specified in [Step 1](#1.-Setup-your-dataset-directory).
 
 With the root directory selected, all `sample` sub-directories will be shown in the section below, with the current progress displayed, and completed samples highlighted in green. The progress indicates how many tomograms in each sample have either: (1) had slices extracted to later be annotated, or (2) have annotations present in an `annotations` folder.
 
@@ -63,10 +64,13 @@ To select which slices to annotate, select a sample, and then, in the section be
 
 Then, press the `Launch ChimeraX` button to open ChimeraX to select slices to later annotate.
 > **__Specifying ChimeraX Settings__**: The path to your ChimeraX executable needs to be set in the application settings before this step.
+> 
 > This is accessed through the File Menu > Settings (Preferences on Mac), and under the **Annotation** dropdown, set the `Chimera Path` settings. The `Number of Slices` setting can also be set to specify the number of slices to use as training data (by default, 5).
 
 > **__Finding the ChimeraX Path__**: On **Windows**, the ChimeraX path is a `ChimeraX.exe` file in your ChimeraX install location in the `bin` folder.
+> 
 > On **Linux**, setting this is not necessary.
+> 
 > On **Mac**, this should be a `ChimeraX` file in the `Contents/MacOS/` directory of your ChimeraX application location (e.g., `Applications/ChimeraX.app/Contents/MacOS/ChimeraX`).
 
 #### 3.i. Using ChimeraX to Select Slices:
@@ -83,12 +87,15 @@ At any point, if you want to stop, simply close ChimeraX. Progress is saved when
 
 ### 4. Annotating Slices:
 
-You can double-check you've selected slices for all training tomograms with the `Slices exported?` or `Slice Progress` columns. When all tomograms are completed, press the `Extract Slices` button to export slices as `.png` images for annotation in [_Hasty.ai_](app.hasty.ai). If not all tomograms in the sample have been processed, a warning will be shown, and missing tomograms can be easily found by looking in the `Slices Exported?` column.
+You can double-check you've selected slices for all training tomograms with the `Slices exported?` or `Slice Progress` columns. When all tomograms are completed, press the `Extract Slices` button to export slices as `.png` images for annotation in [_Hasty.ai_](https://app.hasty.ai). If not all tomograms in the sample have been processed, a warning will be shown, and missing tomograms can be easily found by looking in the `Slices Exported?` column.
 
 In Hasty, you can import your slices at `Content > Import Annotations`, and start annotating them using the `Start annotating` button on the top left.
-> **__Annotation Tips**: Remember important keybinds, like `B` to enable brush mode, `E` to enable eraser, and `Shift + F` to fill any holes.
+> **__Annotation Tips__**: Remember important keybinds, like `B` to enable brush mode, `E` to enable eraser, and `Shift + F` to fill any holes.
+> 
 > For large objects, I recommend outlining the shape, and then using `Shift + F` to fill in the outlines.
+> 
 > Ergonomically, I recommend using a tablet, having the non-pen hand on a keyboard for shortcuts.
+> 
 > Don't be afraid to use `Ctrl + Z` for undoing bad lines, or `Ctrl + Shift + Z` for redos. Also helpful are `Shift + N` and `Shift + B` for moving to the next or previous slices respectively.
 
 When you have finished annotating your slices, export them as segmentation masks (`Content > Export data`; use `grayscale descending` pixel order and order by `z-value`) and put them in an `annotations` folder under the `project root directory` (i.e., `project_root/annotations/sample/segmentation.png`).
