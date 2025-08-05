@@ -56,7 +56,7 @@ When the config is setup, click the button to run pre-processing. This will copy
 
 CryoViT is a minimally-supervised model (i.e., it trains using a small number of annotated data). This is typically 5 good-quality slices in each training tomogram that are annotated with what you want to segment. The **Annotations** tab (next to the **Pre-processing** tab) is used to select and setup these slices.
 
-First, select the `Project Root Directory` at the top. This should be your `Data` directory. This can either be manually entered using the text box, or selected with a prompt using the button on the right. The application will provide warnings and the root directory will not be set if the selected directory doesn't follow the structure specified in [Step 1](#1.-Setup-your-dataset-directory).
+First, select the `Project Root Directory` at the top. This should be your `Data` directory. This can either be manually entered using the text box, or selected with a prompt using the button on the right. The application will provide warnings and the root directory will not be set if the selected directory doesn't follow the structure specified in [Step 1](#1-Setup-your-dataset-directory).
 
 With the root directory selected, all `sample` sub-directories will be shown in the section below, with the current progress displayed, and completed samples highlighted in green. The progress indicates how many tomograms in each sample have either: (1) had slices extracted to later be annotated, or (2) have annotations present in an `annotations` folder.
 
