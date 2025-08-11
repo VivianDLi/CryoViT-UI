@@ -583,7 +583,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         # Check completion status
         sample_df = pd.read_csv(csv_file)
-        annotated = len(sample_df["tomo_name"]) - 1
+        annotated = len(sample_df["tomo_name"])
         total = self.tomogram_model.rowCount()
 
         if annotated < total:
